@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kirana Tap - AI Grocery Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 500px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .chat-header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.bot {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.bot .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-input {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            outline: none;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .chat-input input:focus {
+            border-color: #667eea;
+        }
+
+        .chat-input button {
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        .chat-input button:hover {
+            background: #5a6fd8;
+        }
+
+        .status-message {
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .typing-indicator {
+            display: none;
+            color: #666;
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+
+        .order-status {
+            background: #e8f5e8;
+            border: 1px solid #28a745;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            color: #155724;
+        }
+
+        .order-status.error {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+
+        .order-status.processing {
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+
+        .order-id {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 5px 10px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #495057;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .quick-action-btn {
+            padding: 8px 16px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .quick-action-btn:hover {
+            background: #218838;
+        }
+
+        .quick-action-btn.secondary {
+            background: #6c757d;
+        }
+
+        .quick-action-btn.secondary:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🛒 Kirana Tap</h1>
+            <p>Your AI Grocery Assistant</p>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot">
+                <div class="message-content">
+                    Hi! I'm your AI grocery assistant. Just tell me what you need and I'll order it for you from Blinkit! 🚀
+                </div>
+            </div>
+        </div>
+        
+        <div class="status-message" id="statusMessage">Connecting...</div>
+        <div class="typing-indicator" id="typingIndicator">AI is typing...</div>
+        
+        <div class="chat-input">
+            <div class="input-group">
+                <input type="text" id="messageInput" placeholder="Type your grocery list here..." maxlength="500">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script>
+        // Initialize Socket.IO
+        const socket = io();
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const statusMessage = document.getElementById('statusMessage');
+        const typingIndicator = document.getElementById('typingIndicator');
+
+        // Connection events
+        socket.on('connect', () => {
+            statusMessage.textContent = 'Connected to Kirana Tap!';
+            statusMessage.style.color = '#28a745';
+        });
+
+        socket.on('disconnect', () => {
+            statusMessage.textContent = 'Disconnected. Trying to reconnect...';
+            statusMessage.style.color = '#dc3545';
+        });
+
+        socket.on('status', (data) => {
+            addMessage(data.message, 'bot');
+        });
+
+        socket.on('chat_response', (data) => {
+            addMessage(data.message, 'bot');
+            typingIndicator.style.display = 'none';
+            
+            // If there's an order ID, show quick actions
+            if (data.order_id) {
+                showQuickActions(data.order_id);
+            }
+        });
+
+        socket.on('order_update', (data) => {
+            showOrderStatus(data);
+        });
+
+        // Send message function
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                addMessage(message, 'user');
+                socket.emit('chat_message', { message: message });
+                messageInput.value = '';
+                typingIndicator.style.display = 'block';
+            }
+        }
+
+        // Add message to chat
+        function addMessage(message, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            // Handle newlines in messages
+            const formattedMessage = message.replace(/\n/g, '<br>');
+            messageDiv.innerHTML = `<div class="message-content">${formattedMessage}</div>`;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Show quick action buttons
+        function showQuickActions(orderId) {
+            const quickActionsDiv = document.createElement('div');
+            quickActionsDiv.className = 'quick-actions';
+            quickActionsDiv.innerHTML = `
+                <button class="quick-action-btn" onclick="confirmOrder('${orderId}')">✅ Confirm Order</button>
+                <button class="quick-action-btn secondary" onclick="cancelOrder('${orderId}')">❌ Cancel</button>
+            `;
+            
+            // Add after the last bot message
+            const lastBotMessage = chatMessages.querySelector('.message.bot:last-child');
+            if (lastBotMessage) {
+                lastBotMessage.appendChild(quickActionsDiv);
+            }
+        }
+
+        // Confirm order
+        function confirmOrder(orderId) {
+            socket.emit('confirm_order', { order_id: orderId });
+            addMessage('Order confirmed! Processing...', 'user');
+        }
+
+        // Cancel order
+        function cancelOrder(orderId) {
+            addMessage('Order cancelled.', 'user');
+            // Remove quick actions
+            const quickActions = document.querySelector('.quick-actions');
+            if (quickActions) {
+                quickActions.remove();
+            }
+        }
+
+        // Show order status
+        function showOrderStatus(data) {
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `order-status ${data.status}`;
+            
+            let statusText = '';
+            if (data.status === 'processing') {
+                statusText = '⏳ ' + data.message;
+            } else if (data.status === 'completed') {
+                statusText = '✅ ' + data.message;
+            } else if (data.status === 'failed') {
+                statusText = '❌ ' + data.message;
+            } else {
+                statusText = data.message;
+            }
+            
+            statusDiv.innerHTML = `
+                <strong>Order Status:</strong><br>
+                ${statusText}
+            `;
+            
+            chatMessages.appendChild(statusDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Enter key to send message
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Auto-focus input
+        messageInput.focus();
+    </script>
+</body>
+</html>
