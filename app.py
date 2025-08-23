@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import openai
 import json
 import re
-from blinkit_automation import BlinkitAutomation
+from blinkit_automation_clean import BlinkitAutomation
 import threading
 
 # Load environment variables
@@ -152,10 +152,28 @@ def generate_order_summary(grocery_items):
     
     summary = "I've understood your order! Here's what I'll get for you:\n\n"
     
+    # Use a set to track unique items to avoid duplicates
+    seen_items = set()
+    unique_items = []
+    
     for item in grocery_items:
+        # Create a unique key based on just the item name (normalized) to avoid duplicates
+        # Remove common prefixes like "packet", "pieces", etc. from the name
+        clean_name = item['name'].lower().strip()
+        
+        # Remove common quantity/unit words that might be part of the name
+        clean_name = re.sub(r'\b(packet|packets|piece|pieces|kg|g|liter|liters|dozen|bottle|bottles|can|cans)\b', '', clean_name).strip()
+        clean_name = re.sub(r'\s+', ' ', clean_name)  # Normalize multiple spaces
+        
+        if clean_name not in seen_items:
+            seen_items.add(clean_name)
+            unique_items.append(item)
+    
+    # Generate summary from unique items only
+    for item in unique_items:
         summary += f"• {item['quantity']} {item['unit']} of {item['name'].title()} ({item['category']})\n"
     
-    summary += "\nShould I proceed to place this order on Blinkit with cash on delivery?"
+    summary += "\nReady to place your order? Click the Confirm Order button below or Cancel if you'd like to make changes."
     return summary
 
 @app.route('/')
@@ -332,8 +350,8 @@ def handle_chat_message(data):
         
         response = generate_order_summary(grocery_items)
         
-        # Add order confirmation buttons to the response
-        response += f"\n\nOrder ID: {order_id}\n\nReply with 'yes' to confirm and place this order!"
+        # Remove order ID from initial message - it will be shown after confirmation
+        # response += f"\n\nOrder ID: {order_id}\n\nReply with 'yes' to confirm and place this order!"
         
         print(f"Created order {order_id} with items: {grocery_items}")
     else:
