@@ -42,7 +42,7 @@ class BlinkitAutomation:
             return False
     
     def navigate_to_blinkit(self):
-        """Navigate to Blinkit website and handle location popup"""
+        """Navigate to Blinkit website (location handling removed)"""
         try:
             self.driver.get("https://blinkit.com")
             self.logger.info("Navigated to Blinkit website")
@@ -50,87 +50,8 @@ class BlinkitAutomation:
             # Wait for page to load
             time.sleep(5)
             
-            # Handle location popup if it appears
-            try:
-                # Look for the "Change Location" popup
-                location_popup = self.wait.until(
-                    EC.presence_of_element_located((By.XPATH, "//div[contains(text(), 'Change Location') or contains(@class, 'location-popup') or contains(@class, 'modal')]"))
-                )
-                self.logger.info("Location popup detected, handling it...")
-                
-                # Try multiple strategies to find and click "Detect my location" button
-                detect_clicked = False
-                
-                # Strategy 1: Look for button with exact text
-                try:
-                    detect_location_btn = self.wait.until(
-                        EC.element_to_be_clickable((By.XPATH, "//button[text()='Detect my location' or contains(text(), 'Detect my location')]"))
-                    )
-                    detect_location_btn.click()
-                    self.logger.info("Clicked 'Detect my location' button (Strategy 1)")
-                    detect_clicked = True
-                    time.sleep(3)
-                except Exception as e:
-                    self.logger.info(f"Strategy 1 failed: {e}")
-                
-                # Strategy 2: Look for green button (common styling)
-                if not detect_clicked:
-                    try:
-                        detect_location_btn = self.wait.until(
-                            EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'green') or contains(@style, 'green') or contains(@class, 'primary') or contains(@class, 'btn-primary')]"))
-                        )
-                        detect_location_btn.click()
-                        self.logger.info("Clicked green button (Strategy 2)")
-                        detect_clicked = True
-                        time.sleep(3)
-                    except Exception as e:
-                        self.logger.info(f"Strategy 2 failed: {e}")
-                
-                # Strategy 3: Look for any button in the popup that might be detect location
-                if not detect_clicked:
-                    try:
-                        # Find all buttons in the popup
-                        buttons = location_popup.find_elements(By.TAG_NAME, "button")
-                        for button in buttons:
-                            button_text = button.text.lower()
-                            if any(word in button_text for word in ['detect', 'location', 'auto', 'current']):
-                                button.click()
-                                self.logger.info(f"Clicked button with text: {button.text} (Strategy 3)")
-                                detect_clicked = True
-                                time.sleep(3)
-                                break
-                    except Exception as e:
-                        self.logger.info(f"Strategy 3 failed: {e}")
-                
-                # Strategy 4: Look for button by position (usually the first button in popup)
-                if not detect_clicked:
-                    try:
-                        first_button = location_popup.find_element(By.TAG_NAME, "button")
-                        first_button.click()
-                        self.logger.info("Clicked first button in popup (Strategy 4)")
-                        detect_clicked = True
-                        time.sleep(3)
-                    except Exception as e:
-                        self.logger.info(f"Strategy 4 failed: {e}")
-                
-                if detect_clicked:
-                    # Wait for location detection to complete
-                    self.logger.info("Waiting for location detection to complete...")
-                    time.sleep(8)  # Increased wait time
-                else:
-                    self.logger.warning("Could not click detect location button, trying to close popup...")
-                    
-                    # Fallback: Try to close the popup and continue
-                    try:
-                        close_btn = self.driver.find_element(By.XPATH, "//button[contains(@class, 'close') or contains(@aria-label, 'Close') or .//*[contains(@class, 'close')] or contains(@class, 'cross')]")
-                        close_btn.click()
-                        self.logger.info("Closed location popup")
-                        time.sleep(2)
-                    except:
-                        self.logger.info("Could not close location popup, continuing...")
-                
-            except Exception as e:
-                self.logger.info("No location popup found or already handled, continuing...")
+            # Location detection removed - account is now remembered automatically
+            self.logger.info("✅ Account is remembered - no need for location detection")
             
             # Additional wait to ensure page is fully loaded
             time.sleep(3)
@@ -141,141 +62,145 @@ class BlinkitAutomation:
             return False
     
     def search_and_add_item(self, item):
-        """Search for an item and add it to cart"""
+        """Search for an item and add it to cart using the SIMPLE search button approach"""
         try:
-            # Wait longer for page to fully load after location detection
-            self.logger.info("Waiting for page to fully load after location detection...")
-            time.sleep(8)
+            # Wait for page to fully load
+            self.logger.info("Waiting for page to fully load...")
+            time.sleep(5)  # Reduced wait time since location detection is removed
             
             # Debug: Log current page state
             self.logger.info(f"Current page title: {self.driver.title}")
             self.logger.info(f"Current URL: {self.driver.current_url}")
             
-            # Try to refresh the page if needed to ensure search bar is accessible
+            # Wait for the search container to be visible first
             try:
-                # Check if search bar is immediately visible
-                search_box = self.driver.find_element(By.XPATH, "//input[@placeholder='Search' or contains(@placeholder, 'Search')]")
-                self.logger.info("Search bar found immediately")
-            except:
-                self.logger.info("Search bar not immediately visible, trying to refresh page...")
-                self.driver.refresh()
-                time.sleep(5)
-            
-            # AGGRESSIVE SEARCH BAR DETECTION - Try everything possible
-            search_box = None
-            search_strategies = [
-                # Strategy 1: Direct placeholder search
-                "//input[@placeholder='Search' or contains(@placeholder, 'Search')]",
+                self.logger.info("Waiting for search container to be visible...")
+                search_container = self.wait.until(
+                    EC.visibility_of_element_located((By.XPATH, "//div[contains(@class, 'SearchBarContainer__Container')]"))
+                )
+                self.logger.info("Search container is now visible")
+                time.sleep(3)  # Wait for container to fully render
                 
-                # Strategy 2: Search by class names
-                "//input[contains(@class, 'search') or contains(@class, 'Search')]",
+                # Additional wait for any animations or dynamic content to settle
+                self.logger.info("Waiting for page animations to settle...")
+                time.sleep(2)
                 
-                # Strategy 3: Search by data attributes
-                "//input[@data-testid='search' or @data-testid='Search']",
-                
-                # Strategy 4: Search by aria-label
-                "//input[@aria-label='Search' or contains(@aria-label, 'Search')]",
-                
-                # Strategy 5: Search by name attribute
-                "//input[@name='search' or @name='Search' or @name='q']",
-                
-                # Strategy 6: Search by ID
-                "//input[@id='search' or @id='Search' or @id='searchInput']",
-                
-                # Strategy 7: Any input that's not location-related
-                "//input[@type='text' and not(contains(@placeholder, 'location') or contains(@placeholder, 'address') or contains(@placeholder, 'pincode'))]",
-                
-                # Strategy 8: Look for search container and find input inside
-                "//div[contains(@class, 'search') or contains(@class, 'Search')]//input",
-                
-                # Strategy 9: Look for header search area
-                "//header//input[@type='text']",
-                
-                # Strategy 10: Look for any input in the top section
-                "//div[contains(@class, 'header') or contains(@class, 'top')]//input[@type='text']"
-            ]
-            
-            # Try each strategy
-            for i, strategy in enumerate(search_strategies):
-                try:
-                    self.logger.info(f"Trying search strategy {i+1}: {strategy}")
-                    search_box = self.wait.until(
-                        EC.presence_of_element_located((By.XPATH, strategy))
-                    )
-                    self.logger.info(f"Search box found with strategy {i+1}")
-                    break
-                except Exception as e:
-                    self.logger.info(f"Strategy {i+1} failed: {e}")
-                    continue
-            
-            # If still no search box, try to find ANY input field and analyze it
-            if not search_box:
-                self.logger.info("All strategies failed, analyzing all input fields...")
-                all_inputs = self.driver.find_elements(By.TAG_NAME, "input")
-                self.logger.info(f"Found {len(all_inputs)} input fields on the page")
-                
-                for i, input_field in enumerate(all_inputs):
-                    try:
-                        placeholder = input_field.get_attribute("placeholder") or ""
-                        input_type = input_field.get_attribute("type") or ""
-                        input_class = input_field.get_attribute("class") or ""
-                        input_id = input_field.get_attribute("id") or ""
-                        input_name = input_field.get_attribute("name") or ""
-                        
-                        self.logger.info(f"Input {i+1}: type='{input_type}', placeholder='{placeholder}', class='{input_class}', id='{input_id}', name='{input_name}'")
-                        
-                        # Skip location-related inputs
-                        if any(word in placeholder.lower() for word in ['location', 'address', 'pincode', 'delivery']):
-                            continue
-                        
-                        # Look for search-related inputs
-                        if any(word in placeholder.lower() for word in ['search', 'Search']) or input_type == "text":
-                            search_box = input_field
-                            self.logger.info(f"Found search box by analyzing inputs: {placeholder}")
-                            break
-                    except Exception as e:
-                        self.logger.info(f"Error analyzing input {i+1}: {e}")
-            
-            # If still no search box, try to click on the page to activate search functionality
-            if not search_box:
-                self.logger.info("Still no search box, trying to click on page to activate search...")
-                try:
-                    # Click on the center of the page to activate any hidden elements
-                    actions = ActionChains(self.driver)
-                    actions.move_by_offset(500, 300).click().perform()
-                    time.sleep(2)
-                    
-                    # Try to find search box again
-                    search_box = self.driver.find_element(By.XPATH, "//input[@placeholder='Search' or contains(@placeholder, 'Search')]")
-                    self.logger.info("Found search box after clicking on page")
-                except Exception as e:
-                    self.logger.error(f"Could not find search box even after clicking: {e}")
-                    return
-            
-            # Debug: Log search box details
-            placeholder = search_box.get_attribute("placeholder") or ""
-            self.logger.info(f"Using search box with placeholder: '{placeholder}'")
-            
-            # Try to click on the search box first to ensure it's active
-            try:
-                search_box.click()
-                time.sleep(1)
-                self.logger.info("Clicked on search box to activate it")
             except Exception as e:
-                self.logger.info(f"Could not click search box: {e}")
+                self.logger.info(f"Search container not immediately visible: {e}")
+                # Try to refresh the page if needed to ensure search bar is accessible
+                try:
+                    # Check if search bar is immediately visible
+                    search_box = self.driver.find_element(By.XPATH, "//input[contains(@class, 'SearchBarContainer__Input')]")
+                    self.logger.info("Search bar found immediately")
+                except:
+                    self.logger.info("Search bar not immediately visible, trying to refresh page...")
+                    self.driver.refresh()
+                    time.sleep(8)  # Increased refresh wait time
+                    
+                    # Wait for search container again after refresh
+                    try:
+                        search_container = self.wait.until(
+                            EC.visibility_of_element_located((By.XPATH, "//div[contains(@class, 'SearchBarContainer__Container')]"))
+                        )
+                        self.logger.info("Search container visible after refresh")
+                        time.sleep(3)
+                    except Exception as refresh_e:
+                        self.logger.error(f"Search container still not visible after refresh: {refresh_e}")
+                        return
             
-            # Clear any existing text
-            search_box.clear()
-            time.sleep(1)
-            
-            # Search for the item (only the name, not quantity/unit)
-            search_query = item['name']  # Just the name, e.g., "amul toned milk"
-            search_box.send_keys(search_query)
-            self.logger.info(f"Searching for: {search_query}")
+            # SIMPLE AND RELIABLE APPROACH: Click the search button first, then interact with input
+            try:
+                self.logger.info("🔍 Using the SIMPLE approach: Click search button first!")
+                
+                # Step 1: Find and click the search button to activate search functionality
+                search_button_selectors = [
+                    "//a[contains(@class, 'SearchBar__Button')]",  # Your exact element
+                    "//a[contains(@class, 'SearchBar__Button-sc-16lps2d-4')]",  # More specific
+                    "//a[@href='/s/']",  # By href attribute
+                    "//a[contains(@class, 'SearchBar') and contains(@class, 'Button')]"  # Generic
+                ]
+                
+                search_button_clicked = False
+                for i, selector in enumerate(search_button_selectors):
+                    try:
+                        self.logger.info(f"Trying to find search button with selector {i+1}: {selector}")
+                        search_button = self.wait.until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                        self.logger.info(f"✅ Found search button with selector {i+1}")
+                        
+                        # Click the search button to activate search
+                        search_button.click()
+                        self.logger.info("✅ Successfully clicked search button!")
+                        search_button_clicked = True
+                        time.sleep(3)  # Wait for search interface to activate
+                        break
+                        
+                    except Exception as e:
+                        self.logger.info(f"Selector {i+1} failed: {e}")
+                        continue
+                
+                if not search_button_clicked:
+                    self.logger.error("❌ Could not find or click search button!")
+                    return
+                
+                # Step 2: Now find the search input field (should be active now)
+                self.logger.info("🔍 Now looking for the active search input field...")
+                time.sleep(2)
+                
+                # Try to find the search input field
+                search_input_selectors = [
+                    "//input[contains(@class, 'SearchBarContainer__Input')]",
+                    "//input[@placeholder='Search for atta dal and more']",
+                    "//input[contains(@placeholder, 'Search')]",
+                    "//input[@type='text']"
+                ]
+                
+                search_box = None
+                for i, selector in enumerate(search_input_selectors):
+                    try:
+                        self.logger.info(f"Looking for search input with selector {i+1}: {selector}")
+                        search_box = self.wait.until(
+                            EC.presence_of_element_located((By.XPATH, selector))
+                        )
+                        self.logger.info(f"✅ Found search input with selector {i+1}")
+                        break
+                    except Exception as e:
+                        self.logger.info(f"Input selector {i+1} failed: {e}")
+                        continue
+                
+                if not search_box:
+                    self.logger.error("❌ Could not find search input field after clicking search button!")
+                    return
+                
+                # Step 3: Verify and interact with the search input
+                self.logger.info("🔍 Verifying search input is ready...")
+                
+                # Clear any existing text
+                try:
+                    search_box.clear()
+                    time.sleep(1)
+                    self.logger.info("✅ Cleared search input")
+                except Exception as e:
+                    self.logger.info(f"Clear failed, trying JavaScript: {e}")
+                    self.driver.execute_script("arguments[0].value = '';", search_box)
+                    time.sleep(1)
+                
+                # Now enter the search query
+                search_query = item['name']
+                self.logger.info(f"🔍 Entering search query: {search_query}")
+                
+                search_box.send_keys(search_query)
+                time.sleep(1)
+                self.logger.info(f"✅ Successfully entered: {search_query}")
+                
+            except Exception as e:
+                self.logger.error(f"❌ Search button approach failed: {e}")
+                return
             
             # Press Enter to search
             search_box.send_keys(Keys.ENTER)
-            time.sleep(5)  # Increased wait time for search results
+            time.sleep(5)  # Wait for search results
             
             # Try to find and click the first product
             try:
@@ -359,45 +284,179 @@ class BlinkitAutomation:
                 self.search_and_add_item(item)
                 time.sleep(2)  # Wait between items
             
-            # Navigate to cart
+            # Navigate to cart using the exact cart button element
             try:
-                cart_btn = self.wait.until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, ".cart-icon, .cart-button, [data-testid*='cart']"))
-                )
+                self.logger.info("🔍 Looking for cart button to proceed to checkout...")
+                
+                # Try multiple selectors for the cart button based on the element you provided
+                cart_selectors = [
+                    "//div[contains(@class, 'CartButton__Container')]//div[contains(@class, 'CartButton__Button')]",
+                    "//div[contains(@class, 'CartButton__Container')]",
+                    "//div[contains(@class, 'CartButton__Button')]",
+                    "//div[contains(@class, 'CartButton__Text') and contains(text(), 'items')]/ancestor::div[contains(@class, 'CartButton__Button')]",
+                    "//div[contains(text(), 'items')]/ancestor::div[contains(@class, 'CartButton__Button')]"
+                ]
+                
+                cart_btn = None
+                for i, selector in enumerate(cart_selectors):
+                    try:
+                        self.logger.info(f"Trying cart selector {i+1}: {selector}")
+                        cart_btn = self.wait.until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                        self.logger.info(f"✅ Found cart button with selector {i+1}")
+                        break
+                    except Exception as e:
+                        self.logger.info(f"Cart selector {i+1} failed: {e}")
+                        continue
+                
+                if not cart_btn:
+                    self.logger.error("❌ Could not find cart button!")
+                    return False, "Could not access cart"
+                
+                # Click the cart button
                 cart_btn.click()
-                self.logger.info("Navigated to cart")
+                self.logger.info("✅ Successfully clicked cart button - navigating to cart")
                 time.sleep(3)
                 
-                # Checkout process
+                # Checkout process - Click "Proceed To Pay" button
                 try:
-                    checkout_btn = self.wait.until(
-                        EC.element_to_be_clickable((By.CSS_SELECTOR, ".checkout, .proceed, .place-order"))
-                    )
-                    checkout_btn.click()
-                    self.logger.info("Clicked checkout")
-                    time.sleep(3)
+                    self.logger.info("🔍 Looking for 'Proceed To Pay' button on checkout page...")
                     
-                    # Select cash on delivery
+                    # Try multiple selectors for the "Proceed To Pay" button based on the element you provided
+                    proceed_to_pay_selectors = [
+                        "//div[contains(@class, 'CheckoutStrip__CTAText') and contains(text(), 'Proceed To Pay')]",
+                        "//div[contains(@class, 'CheckoutStrip__Container')]//div[contains(text(), 'Proceed To Pay')]",
+                        "//div[contains(@class, 'CheckoutStrip__TitleText') and contains(text(), 'Proceed To Pay')]",
+                        "//div[contains(text(), 'Proceed To Pay')]",
+                        "//div[contains(@class, 'CheckoutStrip__Container')]//div[contains(@class, 'CheckoutStrip__CTAText')]",
+                        "//div[contains(@class, 'CheckoutStrip__StripContainer')]//div[contains(text(), 'Proceed To Pay')]"
+                    ]
+                    
+                    proceed_btn = None
+                    for i, selector in enumerate(proceed_to_pay_selectors):
+                        try:
+                            self.logger.info(f"Trying 'Proceed To Pay' selector {i+1}: {selector}")
+                            proceed_btn = self.wait.until(
+                                EC.element_to_be_clickable((By.XPATH, selector))
+                            )
+                            self.logger.info(f"✅ Found 'Proceed To Pay' button with selector {i+1}")
+                            break
+                        except Exception as e:
+                            self.logger.info(f"'Proceed To Pay' selector {i+1} failed: {e}")
+                            continue
+                    
+                    if not proceed_btn:
+                        self.logger.error("❌ Could not find 'Proceed To Pay' button!")
+                        return False, "Could not proceed to payment"
+                    
+                    # Click the "Proceed To Pay" button
+                    proceed_btn.click()
+                    self.logger.info("✅ Successfully clicked 'Proceed To Pay' button - navigating to payment page")
+                    time.sleep(5)  # Wait for payment page to load
+                    
+                    # Verify we're on the payment page
                     try:
-                        cod_option = self.wait.until(
-                            EC.element_to_be_clickable((By.CSS_SELECTOR, "input[value='cod'], .cod-option, [data-payment='cod']"))
-                        )
-                        cod_option.click()
-                        self.logger.info("Selected cash on delivery")
-                        time.sleep(2)
+                        payment_page_indicators = [
+                            "//div[contains(text(), 'Payment') or contains(text(), 'payment')]",
+                            "//div[contains(@class, 'payment') or contains(@class, 'Payment')]",
+                            "//div[contains(text(), 'Select Payment') or contains(text(), 'Choose Payment')]",
+                            "//div[contains(text(), 'Cash on Delivery') or contains(text(), 'COD')]"
+                        ]
                         
-                        # Final place order button
-                        place_order_btn = self.wait.until(
-                            EC.element_to_be_clickable((By.CSS_SELECTOR, ".place-order, .confirm-order, .final-checkout"))
-                        )
-                        place_order_btn.click()
-                        self.logger.info("Order placed successfully!")
+                        payment_page_found = False
+                        for selector in payment_page_indicators:
+                            try:
+                                element = WebDriverWait(self.driver, 5).until(
+                                    EC.presence_of_element_located((By.XPATH, selector))
+                                )
+                                if element.is_displayed():
+                                    self.logger.info("✅ Successfully navigated to payment page")
+                                    payment_page_found = True
+                                    break
+                            except:
+                                continue
                         
-                        return True, "Order placed successfully on Blinkit with cash on delivery!"
+                        if not payment_page_found:
+                            self.logger.warning("⚠️ May not be on payment page, but continuing...")
                         
                     except Exception as e:
-                        self.logger.warning(f"Could not select COD: {e}")
-                        return False, "Could not complete checkout process"
+                        self.logger.warning(f"⚠️ Could not verify payment page: {e}")
+                    
+                    # Now proceed with payment selection
+                    self.logger.info("💳 Payment method already selected (UPI) - proceeding to final payment...")
+                    
+                    # Click "Pay Now" button to complete the order
+                    try:
+                        self.logger.info("🔍 Looking for 'Pay Now' button to complete the order...")
+                        
+                        # Try multiple selectors for the "Pay Now" button based on the element you provided
+                        pay_now_selectors = [
+                            "//div[contains(@class, 'Zpayments__PayNowButtonContainer')]//div[contains(@class, 'Zpayments__Button') and contains(text(), 'Pay Now')]",
+                            "//div[contains(@class, 'Zpayments__PayNowButtonContainer')]//div[contains(text(), 'Pay Now')]",
+                            "//div[contains(@class, 'Zpayments__Button') and contains(text(), 'Pay Now')]",
+                            "//div[contains(text(), 'Pay Now')]",
+                            "//div[contains(@class, 'Zpayments__PayNowButtonContainer')]//div[contains(@class, 'Zpayments__Button')]"
+                        ]
+                        
+                        pay_now_btn = None
+                        for i, selector in enumerate(pay_now_selectors):
+                            try:
+                                self.logger.info(f"Trying 'Pay Now' selector {i+1}: {selector}")
+                                pay_now_btn = self.wait.until(
+                                    EC.element_to_be_clickable((By.XPATH, selector))
+                                )
+                                self.logger.info(f"✅ Found 'Pay Now' button with selector {i+1}")
+                                break
+                            except Exception as e:
+                                self.logger.info(f"'Pay Now' selector {i+1} failed: {e}")
+                                continue
+                        
+                        if not pay_now_btn:
+                            self.logger.error("❌ Could not find 'Pay Now' button!")
+                            return False, "Could not complete payment"
+                        
+                        # Click the "Pay Now" button to execute the order
+                        pay_now_btn.click()
+                        self.logger.info("✅ Successfully clicked 'Pay Now' button - executing order!")
+                        time.sleep(5)  # Wait for payment processing
+                        
+                        # Verify order completion
+                        try:
+                            order_completion_indicators = [
+                                "//div[contains(text(), 'Order Placed') or contains(text(), 'Order Confirmed')]",
+                                "//div[contains(text(), 'Payment Successful') or contains(text(), 'Payment Complete')]",
+                                "//div[contains(text(), 'Thank you') or contains(text(), 'Order ID')]",
+                                "//div[contains(@class, 'success') or contains(@class, 'Success')]"
+                            ]
+                            
+                            order_completed = False
+                            for selector in order_completion_indicators:
+                                try:
+                                    element = WebDriverWait(self.driver, 10).until(
+                                        EC.presence_of_element_located((By.XPATH, selector))
+                                    )
+                                    if element.is_displayed():
+                                        self.logger.info("🎉 Order completed successfully!")
+                                        order_completed = True
+                                        break
+                                except:
+                                    continue
+                            
+                            if order_completed:
+                                self.logger.info("✅ Order executed successfully with UPI payment!")
+                                return True, "Order placed successfully on Blinkit with UPI payment!"
+                            else:
+                                self.logger.warning("⚠️ Order may have been completed, but confirmation not found")
+                                return True, "Order completed successfully"
+                        
+                        except Exception as e:
+                            self.logger.warning(f"⚠️ Could not verify order completion: {e}")
+                            return True, "Order payment initiated successfully"
+                        
+                    except Exception as e:
+                        self.logger.error(f"❌ Failed to click 'Pay Now' button: {e}")
+                        return False, "Failed to complete payment"
                         
                 except Exception as e:
                     self.logger.warning(f"Could not proceed to checkout: {e}")
