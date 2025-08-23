@@ -1,210 +1,168 @@
-# 🛒 Kirana Tap - AI Grocery Assistant
+# Kirana Tap - AI Grocery Assistant
 
-**Kirana Tap** is an AI-powered grocery ordering assistant that helps people (especially older adults) order groceries simply by chatting with a bot. The bot parses grocery lists and automates the ordering process on Blinkit with cash on delivery.
+An intelligent grocery ordering assistant that automates the process of ordering groceries from Blinkit using AI-powered natural language processing and Selenium automation.
 
-## 🎯 Problem We're Solving
+## 🚨 **SECURITY WARNING - READ FIRST!**
 
-Most people, especially our parents, struggle with quick commerce apps because the interface is confusing. Kirana Tap makes grocery ordering as simple as typing a message in natural language.
+**⚠️ CRITICAL: This project contains sensitive data that must be secured:**
 
-## 🏗️ Architecture
+1. **API Keys**: Never commit your `.env` file containing API keys
+2. **Chrome Profile**: Contains personal browser data, login credentials, and cookies
+3. **Personal Data**: May contain browsing history and autofill information
 
+**🔒 Security Measures Implemented:**
+- `.env` file is excluded from git tracking
+- `chrome-profile/` directory is excluded from git tracking
+- Environment template provided for safe setup
+
+## 🛡️ **Setup & Security Instructions**
+
+### 1. **Environment Setup (REQUIRED)**
+```bash
+# Copy the environment template
+cp env_template.txt .env
+
+# Edit .env with your actual API keys
+# NEVER commit this file!
 ```
-User Chat → AI Processing → Blinkit Automation → Order Placement
-    ↓              ↓              ↓              ↓
-Web Interface → Parse Items → Headless Browser → Cash on Delivery
-```
+
+### 2. **Chrome Profile Security**
+- The `chrome-profile/` directory contains your personal browser data
+- This directory is automatically excluded from git
+- **DO NOT** manually add it to version control
+- Keep this directory local only
+
+### 3. **API Key Security**
+- Your OpenAI API key is stored in `.env`
+- This file is automatically excluded from git
+- **NEVER** share or commit your `.env` file
+- Use `env_template.txt` as a reference
 
 ## 🚀 Features
 
-- **Natural Language Processing**: Just type your grocery list in plain English
-- **AI-Powered Parsing**: Automatically extracts items, quantities, and units
-- **Automated Ordering**: Places orders on Blinkit using headless browser automation
-- **Cash on Delivery**: No payment integration complexity
-- **Real-time Updates**: Live order status and progress tracking
-- **Beautiful UI**: Modern, responsive chat interface
-
-## 🛠️ Tech Stack
-
-- **Backend**: Flask + Socket.IO (Python)
-- **Frontend**: HTML5 + CSS3 + JavaScript (Vanilla)
-- **AI**: OpenAI GPT-3.5 Turbo
-- **Automation**: Selenium WebDriver (Chrome)
-- **Real-time**: WebSocket communication
+- **AI-Powered Parsing**: Natural language grocery list processing via OpenAI API
+- **Automated Ordering**: Selenium-based automation for Blinkit orders
+- **Persistent Login**: Chrome profile management for seamless authentication
+- **Real-time Updates**: Socket.IO-powered live order status updates
+- **Smart Deduplication**: Intelligent duplicate item detection
+- **Professional UI**: Modern, responsive chat interface
 
 ## 📋 Prerequisites
 
 - Python 3.8+
-- Chrome browser installed
+- Chrome browser
 - OpenAI API key
-- Windows 10/11 (tested on Windows)
+- Blinkit account
 
-## 🚀 Quick Start
+## 🛠️ Installation
 
-### 1. Clone and Setup
-
+1. **Clone the repository**
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd "Kirana Tap 2"
+git clone https://github.com/Kartik0110-lgtm/Kirana-Tap---AI-Grocery-Assistant.git
+cd Kirana-Tap---AI-Grocery-Assistant
+```
 
-# Create virtual environment
-python -m venv venv
-venv\Scripts\activate  # On Windows
-
-# Install dependencies
+2. **Install dependencies**
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
-
+3. **Set up environment variables**
 ```bash
-# Copy environment template
-copy env_template.txt .env
-
-# Edit .env file and add your OpenAI API key
-# Get your API key from: https://platform.openai.com/api-keys
-OPENAI_API_KEY=your_actual_api_key_here
+# Copy and edit the environment template
+cp env_template.txt .env
+# Edit .env with your actual API keys
 ```
 
-### 3. Run the Application
-
+4. **Run the application**
 ```bash
-# Start the server
 python app.py
 ```
 
-### 4. Access the Application
-
-- **Main Interface**: http://localhost:5000
-- **Health Check**: http://localhost:5000/health
-
-## 💬 How to Use
-
-### 1. Start a Conversation
-Open the web app and start chatting with the AI assistant.
-
-### 2. Order Groceries
-Simply type your grocery list in natural language:
-```
-"I need 2 kg potatoes, 1 dozen eggs, and 3 packets of bread"
-"milk 1 liter, bananas 5 pieces, rice 2 kg"
-"2 kg onions, 1 kg tomatoes, 500g ginger"
-```
-
-### 3. Confirm Order
-The AI will parse your list and show a summary. Click "✅ Confirm Order" to proceed.
-
-### 4. Automated Ordering
-The system will automatically:
-- Navigate to Blinkit
-- Search for each item
-- Add items to cart
-- Select cash on delivery
-- Place the order
-
-### 5. Track Progress
-Monitor real-time updates on your order status.
-
 ## 🔧 Configuration
 
-### OpenAI API
-- Get your API key from [OpenAI Platform](https://platform.openai.com/api-keys)
-- Add it to your `.env` file
+### Environment Variables
+- `OPENAI_API_KEY`: Your OpenAI API key (required)
+- `FLASK_ENV`: Flask environment (development/production)
+- `FLASK_DEBUG`: Enable/disable debug mode
+- `PORT`: Custom port number (optional)
 
-### Chrome Driver
-- The app automatically downloads ChromeDriver using `webdriver-manager`
-- Ensure Chrome browser is installed on your system
-
-### Customization
-- Modify `blinkit_automation.py` for different e-commerce sites
-- Adjust AI prompts in `app.py` for different parsing requirements
-- Customize UI in `templates/index.html`
+### Chrome Profile
+- Located in `chrome-profile/` directory
+- Contains persistent login sessions
+- Automatically excluded from version control
+- **Keep this directory secure and local**
 
 ## 📁 Project Structure
 
 ```
 Kirana Tap 2/
-├── app.py                 # Main Flask application
-├── blinkit_automation.py  # Blinkit automation layer
-├── requirements.txt       # Python dependencies
-├── templates/
-│   └── index.html        # Chat interface
-├── env_template.txt       # Environment variables template
-└── README.md             # This file
+├── app.py                          # Flask web application
+├── blinkit_automation_clean.py    # Primary automation script
+├── blinkit_automation.py          # Alternative automation script
+├── templates/                     # HTML templates
+│   └── index.html               # Main chat interface
+├── requirements.txt               # Python dependencies
+├── env_template.txt              # Environment variables template
+├── README.md                     # This file
+├── .gitignore                    # Git exclusions (includes security rules)
+└── chrome-profile/               # Chrome profile (EXCLUDED from git)
 ```
 
-## 🧪 Testing
+## 🚀 Usage
 
-### Test the Chat Interface
-1. Start the application
-2. Open http://localhost:5000
-3. Type a grocery list
-4. Verify AI parsing works
-5. Test order confirmation flow
+1. **Start the application**: `python app.py`
+2. **Open your browser**: Navigate to `http://localhost:5000`
+3. **Type your grocery list**: Use natural language (e.g., "I need 2 packets of milk and 1 kg rice")
+4. **Confirm order**: Review the parsed items and confirm
+5. **Watch automation**: The system automatically orders from Blinkit
 
-### Test Automation (Optional)
-- The automation runs in headless mode
-- Monitor console logs for automation progress
-- Check for any Selenium errors
+## 🔒 Security Best Practices
 
-## 🚨 Important Notes
+1. **Never commit sensitive files**:
+   - `.env` (contains API keys)
+   - `chrome-profile/` (contains personal data)
 
-### Production Considerations
-- **Security**: Add proper user authentication
-- **Database**: Replace in-memory storage with a proper database
-- **Error Handling**: Add comprehensive error handling and retry logic
-- **Rate Limiting**: Implement API rate limiting for OpenAI calls
-- **Logging**: Add proper logging and monitoring
+2. **Use environment templates**:
+   - Copy `env_template.txt` to `.env`
+   - Fill in your actual values
+   - Keep `.env` local only
 
-### Limitations
-- **Demo Purpose**: This is a white-label coding project
-- **Blinkit Specific**: Currently only works with Blinkit
-- **Location**: Uses default location (Delhi, India)
-- **Payment**: Only supports cash on delivery
+3. **Regular security checks**:
+   - Verify `.gitignore` excludes sensitive files
+   - Check git status before commits
+   - Review what's being tracked
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
+1. **API Key Errors**: Ensure `.env` file exists and contains valid API key
+2. **Chrome Profile Issues**: Verify `chrome-profile/` directory exists locally
+3. **Automation Failures**: Check internet connection and Blinkit availability
 
-1. **Chrome Driver Error**
-   - Ensure Chrome browser is installed
-   - Check if antivirus is blocking ChromeDriver
+### Security Issues
+1. **Sensitive Data in Git**: Use `git rm --cached <file>` to remove tracked sensitive files
+2. **API Key Exposure**: Immediately rotate exposed API keys
+3. **Profile Data Leak**: Check `.gitignore` and remove any tracked sensitive directories
 
-2. **OpenAI API Error**
-   - Verify your API key is correct
-   - Check if you have sufficient API credits
+## 📝 Contributing
 
-3. **Blinkit Automation Fails**
-   - Website structure may have changed
-   - Check console logs for specific errors
-   - Verify internet connection
-
-4. **Port Already in Use**
-   - Change port in `app.py` or kill existing process
-   - Use `netstat -ano | findstr :5000` to find process
-
-## 🔮 Future Enhancements
-
-- [ ] Support for multiple e-commerce platforms
-- [ ] User accounts and order history
-- [ ] Payment gateway integration
-- [ ] Mobile app
-- [ ] Voice input support
-- [ ] Multi-language support
-- [ ] Advanced AI features (recommendations, substitutions)
-
-## 📞 Support
-
-This is a demonstration project. For production use, consider:
-- Adding proper error handling
-- Implementing user management
-- Adding monitoring and analytics
-- Security hardening
+1. **Security First**: Never commit sensitive data
+2. **Use Templates**: Always use provided templates for configuration
+3. **Test Locally**: Ensure changes work without exposing sensitive information
 
 ## 📄 License
 
-This project is for educational and demonstration purposes.
+This project is for educational and personal use. Please respect the security measures and never expose sensitive data.
+
+## 🆘 Support
+
+If you encounter security issues:
+1. **Immediately** rotate any exposed API keys
+2. **Check** what data has been committed
+3. **Review** your `.gitignore` configuration
+4. **Contact** the maintainer for assistance
 
 ---
 
-**Made with ❤️ for simplifying grocery shopping**
+**⚠️ Remember: Security is everyone's responsibility. Always verify what you're committing to version control!**
