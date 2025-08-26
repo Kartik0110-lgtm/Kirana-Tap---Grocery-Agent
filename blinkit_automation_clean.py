@@ -16,11 +16,27 @@ class BlinkitAutomation:
     
     def setup_logging(self):
         """Setup logging for automation actions"""
+        # Clear any existing handlers to avoid duplicate logging
+        logging.getLogger().handlers.clear()
+        
+        # Setup detailed logging with timestamps
         logging.basicConfig(
             level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s'
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.StreamHandler(),  # Console output
+                logging.FileHandler('automation.log', mode='w')  # File output
+            ]
         )
+        
+        # Set our logger to INFO level and ensure it's not filtered
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        
+        # Ensure the logger propagates to root logger
+        self.logger.propagate = True
+        
+        self.logger.info("🚀 Logging system initialized - you'll see detailed automation steps!")
     
     def setup_driver(self):
         """Setup Chrome driver with persistent profile for automatic login"""
@@ -47,6 +63,12 @@ class BlinkitAutomation:
                     return False
                 self.logger.info("✅ Profile repaired successfully")
             
+            # Debug any remaining profile issues
+            self.logger.info("🔍 Debugging profile issues...")
+            if not self.debug_profile_issues():
+                self.logger.warning("⚠️ Profile has issues that may affect functionality")
+                self.logger.info("💡 Consider running fix_profile.py to resolve issues")
+            
             # Ensure profile directory is ready
             self.logger.info("📁 Setting up Chrome profile directory...")
             if not self.ensure_profile_directory():
@@ -57,7 +79,16 @@ class BlinkitAutomation:
             
             # Use absolute path for profile directory to avoid any path issues
             import os
-            profile_path = os.path.abspath("./chrome-profile")
+            # Get the absolute path to the current working directory and then to chrome-profile
+            current_dir = os.getcwd()
+            profile_path = os.path.join(current_dir, "chrome-profile")
+            profile_path = os.path.abspath(profile_path)
+            
+            # Ensure the profile directory exists
+            if not os.path.exists(profile_path):
+                os.makedirs(profile_path, exist_ok=True)
+                self.logger.info(f"📁 Created profile directory: {profile_path}")
+            
             chrome_options.add_argument(f"--user-data-dir={profile_path}")
             chrome_options.add_argument("--profile-directory=Default")
             
@@ -77,8 +108,6 @@ class BlinkitAutomation:
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--disable-web-security")
-            chrome_options.add_argument("--allow-running-insecure-content")
             
             # Window and display options
             chrome_options.add_argument("--start-maximized")
@@ -197,7 +226,7 @@ class BlinkitAutomation:
                 self.logger.info("💡 This is normal and shouldn't cause issues")
             
             # Check if profile directory exists and is accessible
-            profile_dir = "./chrome-profile"
+            profile_dir = os.path.join(os.getcwd(), "chrome-profile")
             if os.path.exists(profile_dir):
                 try:
                     # Test if we can write to the profile directory
@@ -274,7 +303,7 @@ class BlinkitAutomation:
             
             # Check if profile directory is locked
             import os
-            profile_dir = "./chrome-profile"
+            profile_dir = os.path.join(os.getcwd(), "chrome-profile")
             
             if os.path.exists(profile_dir):
                 try:
@@ -311,7 +340,7 @@ class BlinkitAutomation:
         try:
             import os
             
-            profile_dir = "./chrome-profile"
+            profile_dir = os.path.join(os.getcwd(), "chrome-profile")
             if not os.path.exists(profile_dir):
                 self.logger.warning("⚠️ Profile directory doesn't exist")
                 return False
@@ -352,7 +381,7 @@ class BlinkitAutomation:
             import os
             import shutil
             
-            profile_dir = "./chrome-profile"
+            profile_dir = os.path.join(os.getcwd(), "chrome-profile")
             
             if not os.path.exists(profile_dir):
                 self.logger.info("📁 Profile directory doesn't exist - nothing to repair")
@@ -430,7 +459,7 @@ class BlinkitAutomation:
                 return False
             
             # Check if the profile directory is being used
-            profile_dir = "./chrome-profile"
+            profile_dir = os.path.join(os.getcwd(), "chrome-profile")
             import os
             
             if not os.path.exists(profile_dir):
@@ -482,7 +511,7 @@ class BlinkitAutomation:
         try:
             import os
             
-            profile_dir = "./chrome-profile"
+            profile_dir = os.path.join(os.getcwd(), "chrome-profile")
             
             # Create profile directory if it doesn't exist
             if not os.path.exists(profile_dir):
@@ -607,7 +636,7 @@ class BlinkitAutomation:
         import os
         
         try:
-            profile_dir = "./chrome-profile"
+            profile_dir = os.path.join(os.getcwd(), "chrome-profile")
             if os.path.exists(profile_dir):
                 shutil.rmtree(profile_dir)
                 self.logger.info(f"✅ Successfully cleared Chrome profile: {profile_dir}")
@@ -625,7 +654,7 @@ class BlinkitAutomation:
         import os
         
         try:
-            profile_dir = "./chrome-profile"
+            profile_dir = os.path.join(os.getcwd(), "chrome-profile")
             if os.path.exists(profile_dir):
                 profile_size = sum(os.path.getsize(os.path.join(dirpath, filename))
                     for dirpath, dirnames, filenames in os.walk(profile_dir)
@@ -634,6 +663,20 @@ class BlinkitAutomation:
                 self.logger.info(f"📁 Chrome profile directory: {profile_dir}")
                 self.logger.info(f"📊 Profile size: {profile_size / (1024*1024):.2f} MB")
                 self.logger.info(f"✅ Profile exists and is ready for use")
+                
+                # Check for lock files
+                lock_files = []
+                for root, dirs, files in os.walk(profile_dir):
+                    for file in files:
+                        if file in ['LOCK', 'LOCK.old']:
+                            lock_files.append(os.path.join(root, file))
+                
+                if lock_files:
+                    self.logger.warning(f"⚠️ Found {len(lock_files)} lock files: {lock_files}")
+                    self.logger.warning("⚠️ These may prevent profile from being used")
+                else:
+                    self.logger.info("✅ No lock files found")
+                
                 return True
             else:
                 self.logger.info(f"📁 Chrome profile directory: {profile_dir}")
@@ -642,6 +685,69 @@ class BlinkitAutomation:
                 return False
         except Exception as e:
             self.logger.error(f"❌ Error getting profile info: {e}")
+            return False
+    
+    def debug_profile_issues(self):
+        """Debug profile issues and provide solutions"""
+        import os
+        
+        try:
+            profile_dir = os.path.join(os.getcwd(), "chrome-profile")
+            self.logger.info("🔍 Debugging Chrome profile issues...")
+            
+            # Check if profile directory exists
+            if not os.path.exists(profile_dir):
+                self.logger.error(f"❌ Profile directory missing: {profile_dir}")
+                self.logger.info("💡 Solution: Profile will be created automatically")
+                return False
+            
+            # Check for lock files
+            lock_files = []
+            for root, dirs, files in os.walk(profile_dir):
+                for file in files:
+                    if file in ['LOCK', 'LOCK.old']:
+                        lock_files.append(os.path.join(root, file))
+            
+            if lock_files:
+                self.logger.warning(f"⚠️ Found lock files: {lock_files}")
+                self.logger.info("💡 Solution: Run fix_profile.py to remove lock files")
+                return False
+            
+            # Check essential files
+            essential_files = [
+                os.path.join(profile_dir, "Default", "Preferences"),
+                os.path.join(profile_dir, "Default", "Login Data"),
+                os.path.join(profile_dir, "Default", "Cookies"),
+                os.path.join(profile_dir, "Default", "Web Data")
+            ]
+            
+            missing_files = []
+            for file_path in essential_files:
+                if not os.path.exists(file_path):
+                    missing_files.append(os.path.basename(file_path))
+            
+            if missing_files:
+                self.logger.warning(f"⚠️ Missing essential files: {missing_files}")
+                self.logger.info("💡 Solution: Profile may be corrupted, run fix_profile.py")
+                return False
+            
+            # Check permissions
+            try:
+                test_file = os.path.join(profile_dir, "test_write.tmp")
+                with open(test_file, 'w') as f:
+                    f.write("test")
+                os.remove(test_file)
+                self.logger.info("✅ Profile directory is writable")
+            except Exception as e:
+                self.logger.error(f"❌ Profile directory is not writable: {e}")
+                self.logger.info("💡 Solution: Check folder permissions or run as administrator")
+                return False
+            
+            self.logger.info("✅ Profile appears to be healthy")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error debugging profile: {e}")
             return False
     
     def search_blinkit_item(self, query, timeout=20):
@@ -794,24 +900,29 @@ class BlinkitAutomation:
     def search_and_add_item(self, item):
         """Search for an item using the correct Blinkit approach: click fake search bar → navigate to search page → find real input"""
         try:
+            self.logger.info(f"🛒 Starting search and add process for: {item['name']}")
+            self.logger.info(f"📝 Item details: {item}")
+            
             # Wait for page to fully load
-            self.logger.info("Waiting for page to fully load...")
+            self.logger.info("⏳ Waiting for page to fully load...")
             time.sleep(5)  # Reduced wait time since location detection is removed
             
             # Debug: Log current page state
-            self.logger.info(f"Current page title: {self.driver.title}")
-            self.logger.info(f"Current URL: {self.driver.current_url}")
+            self.logger.info(f"📄 Current page title: {self.driver.title}")
+            self.logger.info(f"🌐 Current URL: {self.driver.current_url}")
             
             # Use the helper function to perform the search
+            self.logger.info("🔍 STEP 1: Searching for item on Blinkit...")
             search_success = self.search_blinkit_item(item['name'])
             
             if not search_success:
                 self.logger.error("❌ Search failed, cannot proceed with adding item to cart")
-                return
+                return False
             
             self.logger.info("✅ Search completed successfully, now looking for products...")
             
             # Wait for search results to load (REDUCED from 3s to 1s)
+            self.logger.info("⏳ Waiting for search results to load...")
             time.sleep(1)
             
             # DEBUG: Let's see what's actually on the search results page (FAST)
@@ -819,7 +930,7 @@ class BlinkitAutomation:
             self.debug_search_results_page()
             
             # Use the OPTIMIZED cart addition function
-            self.logger.info("🔍 Using OPTIMIZED cart addition function...")
+            self.logger.info("🛒 STEP 2: Adding item to cart...")
             cart_success = self.add_first_item_to_cart(self.driver, timeout=10)
             
             if cart_success:
@@ -829,6 +940,7 @@ class BlinkitAutomation:
                 self.logger.info("🛒 Item added successfully! Now navigating to cart for checkout...")
                 if self.navigate_to_cart():
                     self.logger.info("✅ Successfully navigated to cart - ready for checkout!")
+                    self.logger.info("🎯 Item search and add process completed successfully!")
                     return True  # Return success to indicate we should proceed to checkout
                 else:
                     self.logger.warning("⚠️ Failed to navigate to cart, but item was added")
@@ -838,7 +950,8 @@ class BlinkitAutomation:
                 return False
             
         except Exception as e:
-            self.logger.error(f"Failed to search for {item['name']}: {e}")
+            self.logger.error(f"❌ Error in search and add process: {e}")
+            return False
     
     def check_alternatives(self, item_name):
         """Check for alternative products if the main item is not available"""
@@ -902,151 +1015,235 @@ class BlinkitAutomation:
             # But let's verify and proceed with checkout
             try:
                 # Checkout process - Click "Proceed To Pay" button
+                self.logger.info("🔍 Looking for 'Proceed To Pay' button on checkout page...")
+                
+                # Try multiple selectors for the "Proceed To Pay" button based on the element you provided
+                proceed_to_pay_selectors = [
+                    "//div[contains(@class, 'CheckoutStrip__CTAText') and contains(text(), 'Proceed To Pay')]",
+                    "//div[contains(@class, 'CheckoutStrip__Container')]//div[contains(text(), 'Proceed To Pay')]",
+                    "//div[contains(@class, 'CheckoutStrip__TitleText') and contains(text(), 'Proceed To Pay')]",
+                    "//div[contains(text(), 'Proceed To Pay')]",
+                    "//div[contains(@class, 'CheckoutStrip__Container')]//div[contains(@class, 'CheckoutStrip__CTAText')]",
+                    "//div[contains(@class, 'CheckoutStrip__StripContainer')]//div[contains(text(), 'Proceed To Pay')]"
+                ]
+                
+                proceed_btn = None
+                for i, selector in enumerate(proceed_to_pay_selectors):
+                    try:
+                        self.logger.info(f"Trying 'Proceed To Pay' selector {i+1}: {selector}")
+                        proceed_btn = self.wait.until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                        self.logger.info(f"✅ Found 'Proceed To Pay' button with selector {i+1}")
+                        break
+                    except Exception as e:
+                        self.logger.info(f"'Proceed To Pay' selector {i+1} failed: {e}")
+                        continue
+                
+                if not proceed_btn:
+                    self.logger.error("❌ Could not find 'Proceed To Pay' button!")
+                    return False, "Could not proceed to payment"
+                
+                # Click the "Proceed To Pay" button
+                proceed_btn.click()
+                self.logger.info("✅ Successfully clicked 'Proceed To Pay' button - navigating to payment page")
+                time.sleep(5)  # Wait for payment page to load
+                
+                # Verify we're on the payment page
                 try:
-                    self.logger.info("🔍 Looking for 'Proceed To Pay' button on checkout page...")
-                    
-                    # Try multiple selectors for the "Proceed To Pay" button based on the element you provided
-                    proceed_to_pay_selectors = [
-                        "//div[contains(@class, 'CheckoutStrip__CTAText') and contains(text(), 'Proceed To Pay')]",
-                        "//div[contains(@class, 'CheckoutStrip__Container')]//div[contains(text(), 'Proceed To Pay')]",
-                        "//div[contains(@class, 'CheckoutStrip__TitleText') and contains(text(), 'Proceed To Pay')]",
-                        "//div[contains(text(), 'Proceed To Pay')]",
-                        "//div[contains(@class, 'CheckoutStrip__Container')]//div[contains(@class, 'CheckoutStrip__CTAText')]",
-                        "//div[contains(@class, 'CheckoutStrip__StripContainer')]//div[contains(text(), 'Proceed To Pay')]"
+                    payment_page_indicators = [
+                        "//div[contains(text(), 'Payment') or contains(text(), 'payment')]",
+                        "//div[contains(@class, 'payment') or contains(@class, 'Payment')]",
+                        "//div[contains(text(), 'Select Payment') or contains(text(), 'Choose Payment')]",
+                        "//div[contains(text(), 'Cash on Delivery') or contains(text(), 'COD')]"
                     ]
                     
-                    proceed_btn = None
-                    for i, selector in enumerate(proceed_to_pay_selectors):
+                    payment_page_found = False
+                    for selector in payment_page_indicators:
                         try:
-                            self.logger.info(f"Trying 'Proceed To Pay' selector {i+1}: {selector}")
-                            proceed_btn = self.wait.until(
-                                EC.element_to_be_clickable((By.XPATH, selector))
+                            element = WebDriverWait(self.driver, 5).until(
+                                EC.presence_of_element_located((By.XPATH, selector))
                             )
-                            self.logger.info(f"✅ Found 'Proceed To Pay' button with selector {i+1}")
-                            break
-                        except Exception as e:
-                            self.logger.info(f"'Proceed To Pay' selector {i+1} failed: {e}")
+                            if element.is_displayed():
+                                self.logger.info("✅ Successfully navigated to payment page")
+                                payment_page_found = True
+                                break
+                        except:
                             continue
                     
-                    if not proceed_btn:
-                        self.logger.error("❌ Could not find 'Proceed To Pay' button!")
-                        return False, "Could not proceed to payment"
+                    if not payment_page_found:
+                        self.logger.warning("⚠️ May not be on payment page, but continuing...")
                     
-                    # Click the "Proceed To Pay" button
-                    proceed_btn.click()
-                    self.logger.info("✅ Successfully clicked 'Proceed To Pay' button - navigating to payment page")
-                    time.sleep(5)  # Wait for payment page to load
-                    
-                    # Verify we're on the payment page
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Could not verify payment page: {e}")
+                
+                # Now proceed with payment selection
+                self.logger.info("💳 Payment method already selected (UPI) - proceeding to final payment...")
+                
+                # Click "Pay Now" button to complete the order
+                self.logger.info("🔍 Looking for 'Pay Now' button to complete the order...")
+                
+                # Try multiple selectors for the "Pay Now" button based on the element you provided
+                pay_now_selectors = [
+                    "//div[contains(@class, 'Zpayments__PayNowButtonContainer')]//div[contains(@class, 'Zpayments__Button') and contains(text(), 'Pay Now')]",
+                    "//div[contains(@class, 'Zpayments__PayNowButtonContainer')]//div[contains(text(), 'Pay Now')]",
+                    "//div[contains(@class, 'Zpayments__Button') and contains(text(), 'Pay Now')]",
+                    "//div[contains(text(), 'Pay Now')]",
+                    "//div[contains(@class, 'Zpayments__PayNowButtonContainer')]//div[contains(@class, 'Zpayments__Button')]"
+                ]
+                
+                pay_now_btn = None
+                for i, selector in enumerate(pay_now_selectors):
                     try:
-                        payment_page_indicators = [
-                            "//div[contains(text(), 'Payment') or contains(text(), 'payment')]",
-                            "//div[contains(@class, 'payment') or contains(@class, 'Payment')]",
-                            "//div[contains(text(), 'Select Payment') or contains(text(), 'Choose Payment')]",
-                            "//div[contains(text(), 'Cash on Delivery') or contains(text(), 'COD')]"
-                        ]
-                        
-                        payment_page_found = False
-                        for selector in payment_page_indicators:
-                            try:
-                                element = WebDriverWait(self.driver, 5).until(
-                                    EC.presence_of_element_located((By.XPATH, selector))
-                                )
-                                if element.is_displayed():
-                                    self.logger.info("✅ Successfully navigated to payment page")
-                                    payment_page_found = True
-                                    break
-                            except:
-                                continue
-                        
-                        if not payment_page_found:
-                            self.logger.warning("⚠️ May not be on payment page, but continuing...")
-                        
+                        self.logger.info(f"Trying 'Pay Now' selector {i+1}: {selector}")
+                        pay_now_btn = self.wait.until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                        self.logger.info(f"✅ Found 'Pay Now' button with selector {i+1}")
+                        break
                     except Exception as e:
-                        self.logger.warning(f"⚠️ Could not verify payment page: {e}")
-                    
-                    # Now proceed with payment selection
-                    self.logger.info("💳 Payment method already selected (UPI) - proceeding to final payment...")
-                    
-                    # Click "Pay Now" button to complete the order
+                        self.logger.info(f"'Pay Now' selector {i+1} failed: {e}")
+                        continue
+                
+                if not pay_now_btn:
+                    self.logger.error("❌ Could not find 'Pay Now' button!")
+                    return False, "Could not complete payment"
+                
+                # Click the "Pay Now" button to execute the order
+                pay_now_btn.click()
+                self.logger.info("✅ Successfully clicked 'Pay Now' button - executing order!")
+                
+                # Wait for payment processing with timeout
+                start_time = time.time()
+                timeout = 30  # 30 seconds timeout
+                
+                while time.time() - start_time < timeout:
+                    time.sleep(2)
+                    # Check if we've moved away from payment page
                     try:
-                        self.logger.info("🔍 Looking for 'Pay Now' button to complete the order...")
-                        
-                        # Try multiple selectors for the "Pay Now" button based on the element you provided
-                        pay_now_selectors = [
-                            "//div[contains(@class, 'Zpayments__PayNowButtonContainer')]//div[contains(@class, 'Zpayments__Button') and contains(text(), 'Pay Now')]",
-                            "//div[contains(@class, 'Zpayments__PayNowButtonContainer')]//div[contains(text(), 'Pay Now')]",
-                            "//div[contains(@class, 'Zpayments__Button') and contains(text(), 'Pay Now')]",
-                            "//div[contains(text(), 'Pay Now')]",
-                            "//div[contains(@class, 'Zpayments__PayNowButtonContainer')]//div[contains(@class, 'Zpayments__Button')]"
-                        ]
-                        
-                        pay_now_btn = None
-                        for i, selector in enumerate(pay_now_selectors):
-                            try:
-                                self.logger.info(f"Trying 'Pay Now' selector {i+1}: {selector}")
-                                pay_now_btn = self.wait.until(
-                                    EC.element_to_be_clickable((By.XPATH, selector))
-                                )
-                                self.logger.info(f"✅ Found 'Pay Now' button with selector {i+1}")
-                                break
-                            except Exception as e:
-                                self.logger.info(f"'Pay Now' selector {i+1} failed: {e}")
-                                continue
-                        
-                        if not pay_now_btn:
-                            self.logger.error("❌ Could not find 'Pay Now' button!")
-                            return False, "Could not complete payment"
-                        
-                        # Click the "Pay Now" button to execute the order
-                        pay_now_btn.click()
-                        self.logger.info("✅ Successfully clicked 'Pay Now' button - executing order!")
-                        time.sleep(5)  # Wait for payment processing
-                        
-                        # Verify order completion
+                        current_url = self.driver.current_url
+                        if 'payment' not in current_url.lower() and 'checkout' not in current_url.lower():
+                            break
+                    except:
+                        pass
+                
+                self.logger.info("⏳ Payment processing completed, checking order status...")
+                
+                # Check for cancellation or failure indicators first
+                cancellation_indicators = [
+                    "//div[contains(text(), 'Order Cancelled') or contains(text(), 'Order Cancelled')]",
+                    "//div[contains(text(), 'Payment Failed') or contains(text(), 'Payment Unsuccessful')]",
+                    "//div[contains(text(), 'Transaction Failed') or contains(text(), 'Failed')]",
+                    "//div[contains(text(), 'Error') or contains(text(), 'error')]",
+                    "//div[contains(@class, 'error') or contains(@class, 'Error')]",
+                    "//div[contains(text(), 'Cancelled') or contains(text(), 'cancelled')]",
+                    "//div[contains(text(), 'Declined') or contains(text(), 'declined')]",
+                    "//div[contains(text(), 'Insufficient') or contains(text(), 'insufficient')]"
+                ]
+                
+                order_cancelled = False
+                for selector in cancellation_indicators:
+                    try:
+                        element = WebDriverWait(self.driver, 3).until(
+                            EC.presence_of_element_located((By.XPATH, selector))
+                        )
+                        if element.is_displayed():
+                            self.logger.warning("⚠️ Order appears to have been cancelled or failed")
+                            order_cancelled = True
+                            break
+                    except:
+                        continue
+                
+                if order_cancelled:
+                    return False, "Order was cancelled or payment failed - please try again"
+                
+                # Also check if we're back to cart (indicates order didn't go through)
+                try:
+                    cart_indicators = [
+                        "//div[contains(text(), 'Cart') or contains(text(), 'cart')]",
+                        "//div[contains(text(), 'items') and contains(text(), '₹')]"
+                    ]
+                    
+                    back_to_cart = False
+                    for selector in cart_indicators:
                         try:
-                            order_completion_indicators = [
-                                "//div[contains(text(), 'Order Placed') or contains(text(), 'Order Confirmed')]",
-                                "//div[contains(text(), 'Payment Successful') or contains(text(), 'Payment Complete')]",
-                                "//div[contains(text(), 'Thank you') or contains(text(), 'Order ID')]",
-                                "//div[contains(@class, 'success') or contains(@class, 'Success')]"
+                            element = self.driver.find_element(By.XPATH, selector)
+                            if element.is_displayed():
+                                back_to_cart = True
+                                break
+                        except:
+                            continue
+                    
+                    if back_to_cart:
+                        self.logger.warning("⚠️ Back to cart page - order may not have been processed")
+                        return False, "Order was not processed - you were returned to cart"
+                        
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Could not check cart status: {e}")
+                
+                # Verify order completion
+                try:
+                    order_completion_indicators = [
+                        "//div[contains(text(), 'Order Placed') or contains(text(), 'Order Confirmed')]",
+                        "//div[contains(text(), 'Payment Successful') or contains(text(), 'Payment Complete')]",
+                        "//div[contains(text(), 'Thank you') or contains(text(), 'Thank You')]",
+                        "//div[contains(text(), 'Order Successfully') or contains(text(), 'Order Received')]",
+                        "//div[contains(@class, 'success') or contains(@class, 'Success')]"
+                    ]
+                    
+                    order_completed = False
+                    for selector in order_completion_indicators:
+                        try:
+                            element = WebDriverWait(self.driver, 10).until(
+                                EC.presence_of_element_located((By.XPATH, selector))
+                            )
+                            if element.is_displayed():
+                                self.logger.info("🎉 Order completed successfully!")
+                                order_completed = True
+                                break
+                        except:
+                            continue
+                    
+                    if order_completed:
+                        self.logger.info("✅ Order executed successfully with UPI payment!")
+                        return True, "Order placed successfully on Blinkit with UPI payment!"
+                    else:
+                        # Additional check for ambiguous states
+                        self.logger.warning("⚠️ Order completion could not be verified")
+                        
+                        # Check if we're still on payment page (might indicate payment didn't go through)
+                        try:
+                            payment_page_indicators = [
+                                "//div[contains(text(), 'Payment') or contains(text(), 'payment')]",
+                                "//div[contains(text(), 'Select Payment') or contains(text(), 'Choose Payment')]"
                             ]
                             
-                            order_completed = False
-                            for selector in order_completion_indicators:
+                            still_on_payment = False
+                            for selector in payment_page_indicators:
                                 try:
-                                    element = WebDriverWait(self.driver, 10).until(
-                                        EC.presence_of_element_located((By.XPATH, selector))
-                                    )
+                                    element = self.driver.find_element(By.XPATH, selector)
                                     if element.is_displayed():
-                                        self.logger.info("🎉 Order completed successfully!")
-                                        order_completed = True
+                                        still_on_payment = True
                                         break
                                 except:
                                     continue
                             
-                            if order_completed:
-                                self.logger.info("✅ Order executed successfully with UPI payment!")
-                                return True, "Order placed successfully on Blinkit with UPI payment!"
-                            else:
-                                self.logger.warning("⚠️ Order may have been completed, but confirmation not found")
-                                return True, "Order completed successfully"
-                        
+                            if still_on_payment:
+                                self.logger.warning("⚠️ Still on payment page - payment may not have been processed")
+                                return False, "Payment was not processed - please try again or check your payment method"
+                            
                         except Exception as e:
-                            self.logger.warning(f"⚠️ Could not verify order completion: {e}")
-                            return True, "Order payment initiated successfully"
+                            self.logger.warning(f"⚠️ Could not check payment page status: {e}")
                         
-                    except Exception as e:
-                        self.logger.error(f"❌ Failed to click 'Pay Now' button: {e}")
-                        return False, "Failed to complete payment"
-                        
+                        return False, "Order completion could not be verified - please check your Blinkit account"
+                
                 except Exception as e:
-                    self.logger.warning(f"Could not proceed to checkout: {e}")
-                    return False, "Could not proceed to checkout"
-                    
+                    self.logger.warning(f"⚠️ Could not verify order completion: {e}")
+                    return False, "Order completion verification failed - please check your Blinkit account"
+                
             except Exception as e:
-                self.logger.warning(f"Could not navigate to cart: {e}")
-                return False, "Could not access cart"
+                self.logger.warning(f"Could not proceed to checkout: {e}")
+                return False, "Could not proceed to checkout"
                 
         except Exception as e:
             self.logger.error(f"Order placement failed: {e}")
@@ -1308,14 +1505,14 @@ class BlinkitAutomation:
         FIXED VERSION: Uses exact CSS selector for Blinkit's Add button based on actual HTML structure.
         """
         try:
-            self.logger.info("[INFO] Starting add_first_item_to_cart function")
+            self.logger.info("🛒 Starting add_first_item_to_cart function")
             
             # Wait for search results to fully load (small buffer as suggested)
-            self.logger.info("[INFO] Waiting for search results to load (2s buffer)...")
+            self.logger.info("⏳ Waiting for search results to load (2s buffer)...")
             time.sleep(2)
             
             # Step 1: Find the first Add button using the exact CSS selector from Blinkit's HTML
-            self.logger.info("[INFO] Looking for first Add button using exact CSS selector...")
+            self.logger.info("🔍 Looking for first Add button using exact CSS selector...")
             
             # The exact CSS selector based on the HTML you provided
             add_button_selector = "div.tw-rounded-md.tw-font-okra.tw-flex.tw-justify-center.tw-font-semibold.tw-items-center.tw-relative.tw-text-300.tw-py-2.tw-px-0.tw-gap-0\\.5.tw-min-w-\\[66px\\].tw-bg-green-050.tw-border.tw-border-base-green.tw-text-base-green"
@@ -1325,53 +1522,53 @@ class BlinkitAutomation:
                 add_button = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, add_button_selector))
                 )
-                self.logger.info("[INFO] First Add button found and is clickable")
+                self.logger.info("✅ First Add button found and is clickable")
                 
             except Exception as e:
-                self.logger.warning(f"[WARNING] Add button not found initially: {e}")
+                self.logger.warning(f"⚠️ Add button not found initially: {e}")
                 
                 # Fallback: Try to find all matching elements and take the first one
-                self.logger.info("[INFO] Trying fallback approach - finding all Add buttons...")
+                self.logger.info("🔄 Trying fallback approach - finding all Add buttons...")
                 try:
                     add_buttons = driver.find_elements(By.CSS_SELECTOR, add_button_selector)
                     if add_buttons:
                         add_button = add_buttons[0]  # Take the first one
-                        self.logger.info(f"[INFO] Found {len(add_buttons)} Add buttons, using first one")
+                        self.logger.info(f"✅ Found {len(add_buttons)} Add buttons, using first one")
                     else:
-                        self.logger.error("[ERROR] No Add buttons found with CSS selector")
+                        self.logger.error("❌ No Add buttons found with CSS selector")
                         return False
                         
                 except Exception as fallback_e:
-                    self.logger.error(f"[ERROR] Fallback approach failed: {fallback_e}")
+                    self.logger.error(f"❌ Fallback approach failed: {fallback_e}")
                     return False
             
             # Step 2: Click the Add button immediately
-            self.logger.info("[INFO] Clicking Add button...")
+            self.logger.info("🖱️ Clicking Add button...")
             try:
                 # Click the button directly
                 add_button.click()
-                self.logger.info("[INFO] Successfully clicked Add button")
+                self.logger.info("✅ Successfully clicked Add button")
                 
                 # Wait a moment for cart update
                 time.sleep(1)
                 
-                self.logger.info("[INFO] Added first item to cart")
+                self.logger.info("🎉 Added first item to cart")
                 return True
                 
             except Exception as click_e:
-                self.logger.error(f"[ERROR] Failed to click Add button: {click_e}")
+                self.logger.error(f"❌ Failed to click Add button: {click_e}")
                 
                 # Try JavaScript click as fallback
                 try:
                     driver.execute_script("arguments[0].click();", add_button)
-                    self.logger.info("[INFO] Successfully clicked Add button using JavaScript")
+                    self.logger.info("✅ Successfully clicked Add button using JavaScript")
                     time.sleep(1)
-                    self.logger.info("[INFO] Added first item to cart (JavaScript fallback)")
+                    self.logger.info("🎉 Added first item to cart (JavaScript fallback)")
                     return True
                 except Exception as js_e:
-                    self.logger.error(f"[ERROR] JavaScript click also failed: {js_e}")
+                    self.logger.error(f"❌ JavaScript click also failed: {js_e}")
                     return False
             
         except Exception as e:
-            self.logger.error(f"[ERROR] add_first_item_to_cart failed: {e}")
+            self.logger.error(f"❌ add_first_item_to_cart failed: {e}")
             return False
