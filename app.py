@@ -26,11 +26,16 @@ def parse_grocery_list(user_message):
     Parse user's grocery list using AI to extract structured items
     """
     try:
+        print(f"🔍 Parsing grocery list: '{user_message}'")
+        print(f"📝 Number of lines: {len(user_message.split(chr(10)))}")
+        
         # Create a system prompt for grocery parsing
         system_prompt = """You are a grocery assistant. Parse the user's grocery list into structured items.
         Return ONLY a JSON array with objects containing: name, quantity, unit, category.
         
         IMPORTANT: The 'name' field should be the search term for the grocery store, without quantity/unit.
+        
+        CRITICAL: When the user provides multiple lines (separated by line breaks), treat each line as a SEPARATE item.
         
         Examples:
         - "I need 2 kg potatoes, 1 dozen eggs, and 3 packets of bread"
@@ -48,11 +53,23 @@ def parse_grocery_list(user_message):
         - "three packets heritage milk"
         - Output: [{"name": "heritage milk", "quantity": 3, "unit": "packets", "category": "dairy"}]
         
+        MULTI-LINE EXAMPLES (each line is a separate item):
+        - "one packet amul toned milk
+          banana"
+        - Output: [{"name": "amul toned milk", "quantity": 1, "unit": "packet", "category": "dairy"}, {"name": "banana", "quantity": 1, "unit": "pieces", "category": "fruits"}]
+        
+        - "2 kg potatoes
+          1 dozen eggs
+          3 packets bread"
+        - Output: [{"name": "potatoes", "quantity": 2, "unit": "kg", "category": "vegetables"}, {"name": "eggs", "quantity": 1, "unit": "dozen", "category": "dairy"}, {"name": "bread", "quantity": 3, "unit": "packets", "category": "bakery"}]
+        
         Keep categories simple: vegetables, fruits, dairy, grains, bakery, snacks, beverages, household, personal_care
         
         Handle simple formats like "one packet milk" or "2 kg potatoes" correctly.
         
-        The 'name' field should be clean and searchable (e.g., "amul toned milk" not "one packet amul toned milk")."""
+        The 'name' field should be clean and searchable (e.g., "amul toned milk" not "one packet amul toned milk").
+        
+        REMEMBER: Each line break means a NEW ITEM!"""
         
         # Get AI response
         response = openai.ChatCompletion.create(
@@ -67,34 +84,43 @@ def parse_grocery_list(user_message):
         
         # Extract and parse JSON response
         ai_response = response.choices[0].message.content.strip()
+        print(f"🤖 AI Response: {ai_response}")
         
         # Clean the response to extract just the JSON
         json_match = re.search(r'\[.*\]', ai_response, re.DOTALL)
         if json_match:
             grocery_items = json.loads(json_match.group())
+            print(f"✅ AI Parsing successful: {len(grocery_items)} items found")
             return grocery_items
         else:
+            print("⚠️ AI parsing failed, using fallback parsing")
             # Fallback parsing for simple cases
             return fallback_parsing(user_message)
             
     except Exception as e:
-        print(f"AI parsing error: {e}")
+        print(f"❌ AI parsing error: {e}")
+        print("🔄 Using fallback parsing")
         return fallback_parsing(user_message)
 
 def fallback_parsing(user_message):
     """
     Simple fallback parsing when AI fails
     """
+    print(f"🔄 Using fallback parsing for: '{user_message}'")
     items = []
-    # Basic pattern matching for common formats
+    
+    # Split by lines and process each line separately
+    lines = [line.strip() for line in user_message.split('\n') if line.strip()]
+    print(f"📝 Fallback parsing found {len(lines)} lines: {lines}")
+    
+    # Basic pattern matching for common formats (ordered by specificity)
     patterns = [
-        # "one packet amul toned milk" or "1 packet milk"
-        r'(one|two|three|four|five|six|seven|eight|nine|ten)\s+(packet|packets|kg|g|liter|liters|piece|pieces|dozen)\s+([a-zA-Z\s]+)',
-        r'(\d+)\s*(packet|packets|kg|g|liters?|pieces?|dozen)\s+of?\s+([a-zA-Z\s]+)',
-        r'(\d+)\s+([a-zA-Z\s]+)\s+(\d+)\s*(packet|packets|kg|g|liters?|pieces?|dozen)',
-        r'(\d+)\s+([a-zA-Z\s]+)',
-        # Handle "one milk" format
-        r'(one|two|three|four|five|six|seven|eight|nine|ten)\s+([a-zA-Z\s]+)'
+        # Most specific: "one packet amul toned milk" or "1 packet milk"
+        r'^(one|two|three|four|five|six|seven|eight|nine|ten)\s+(packet|packets|kg|g|liter|liters|piece|pieces|dozen)\s+([a-zA-Z\s]+)$',
+        r'^(\d+)\s*(packet|packets|kg|g|liters?|pieces?|dozen)\s+of?\s+([a-zA-Z\s]+)$',
+        # Less specific: "one milk" or "1 milk"
+        r'^(one|two|three|four|five|six|seven|eight|nine|ten)\s+([a-zA-Z\s]+)$',
+        r'^(\d+)\s+([a-zA-Z\s]+)$'
     ]
     
     # Convert word numbers to digits
@@ -103,44 +129,69 @@ def fallback_parsing(user_message):
         'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
     }
     
-    for pattern in patterns:
-        matches = re.findall(pattern, user_message, re.IGNORECASE)
-        for match in matches:
-            if len(match) == 3:
-                if match[0].lower() in word_to_num:
-                    # Handle "one packet milk" format
-                    quantity = word_to_num[match[0].lower()]
-                    unit = match[1].lower()
-                    name = match[2].strip().lower()
-                else:
-                    # Handle "1 packet milk" format
-                    quantity = int(match[0])
-                    unit = match[1].lower()
-                    name = match[2].strip().lower()
-                
-                items.append({
-                    "name": name,
-                    "quantity": quantity,
-                    "unit": unit,
-                    "category": "general"
-                })
-            elif len(match) == 2:
-                if match[0].lower() in word_to_num:
-                    # Handle "one milk" format
-                    quantity = word_to_num[match[0].lower()]
-                    name = match[1].strip().lower()
-                else:
-                    # Handle "1 milk" format
-                    quantity = int(match[0])
-                    name = match[1].strip().lower()
-                
-                items.append({
-                    "name": name,
-                    "quantity": quantity,
-                    "unit": "pieces",
-                    "category": "general"
-                })
+    # Process each line as a separate item
+    for i, line in enumerate(lines):
+        print(f"🔍 Processing line {i+1}: '{line}'")
+        line_items = []
+        
+        # Try to match patterns for this line
+        for pattern in patterns:
+            match = re.match(pattern, line, re.IGNORECASE)
+            if match:
+                groups = match.groups()
+                if len(groups) == 3:
+                    if groups[0].lower() in word_to_num:
+                        # Handle "one packet milk" format
+                        quantity = word_to_num[groups[0].lower()]
+                        unit = groups[1].lower()
+                        name = groups[2].strip().lower()
+                    else:
+                        # Handle "1 packet milk" format
+                        quantity = int(groups[0])
+                        unit = groups[1].lower()
+                        name = groups[2].strip().lower()
+                    
+                    line_items.append({
+                        "name": name,
+                        "quantity": quantity,
+                        "unit": unit,
+                        "category": "general"
+                    })
+                    break  # Found a match, don't try other patterns for this line
+                elif len(groups) == 2:
+                    if groups[0].lower() in word_to_num:
+                        # Handle "one milk" format
+                        quantity = word_to_num[groups[0].lower()]
+                        name = groups[1].strip().lower()
+                    else:
+                        # Handle "1 milk" format
+                        quantity = int(groups[0])
+                        name = groups[1].strip().lower()
+                    
+                    line_items.append({
+                        "name": name,
+                        "quantity": quantity,
+                        "unit": "pieces",
+                        "category": "general"
+                    })
+                    break  # Found a match, don't try other patterns for this line
+        
+        # If no patterns matched for this line, treat the entire line as a single item
+        if not line_items and line.strip():
+            # Simple case: just the item name (assume quantity 1, unit pieces)
+            print(f"✅ Line {i+1}: No pattern match, treating as simple item: '{line.strip()}'")
+            items.append({
+                "name": line.strip().lower(),
+                "quantity": 1,
+                "unit": "pieces",
+                "category": "general"
+            })
+        else:
+            # Add items found in this line (should only be one per line now)
+            print(f"✅ Line {i+1}: Pattern match found, adding {len(line_items)} items")
+            items.extend(line_items)
     
+    print(f"🎯 Fallback parsing complete: {len(items)} total items found")
     return items
 
 def generate_order_summary(grocery_items):

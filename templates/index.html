@@ -101,7 +101,8 @@
             gap: 10px;
         }
 
-        .chat-input input {
+        .chat-input input,
+        .chat-input textarea {
             flex: 1;
             padding: 12px 16px;
             border: 2px solid #e0e0e0;
@@ -109,9 +110,15 @@
             outline: none;
             font-size: 16px;
             transition: border-color 0.3s;
+            resize: none;
+            font-family: inherit;
+            min-height: 48px;
+            max-height: 120px;
+            overflow-y: auto;
         }
 
-        .chat-input input:focus {
+        .chat-input input:focus,
+        .chat-input textarea:focus {
             border-color: #667eea;
         }
 
@@ -245,7 +252,8 @@
         <div class="chat-messages" id="chatMessages">
             <div class="message bot">
                 <div class="message-content">
-                    Hi! I'm your AI grocery assistant. Just tell me what you need and I'll order it for you from Blinkit! 🚀
+                    Hi! I'm your AI grocery assistant. Just tell me what you need and I'll order it for you from Blinkit! 🚀<br><br>
+                    💡 <strong>Tip:</strong> Use <strong>Shift+Enter</strong> to add multiple items on separate lines!
                 </div>
             </div>
         </div>
@@ -255,7 +263,7 @@
         
         <div class="chat-input">
             <div class="input-group">
-                <input type="text" id="messageInput" placeholder="Type your grocery list here..." maxlength="500">
+                <textarea id="messageInput" placeholder="Type your grocery list here...&#10;Use Shift+Enter for new lines" maxlength="500"></textarea>
                 <button onclick="sendMessage()">Send</button>
             </div>
         </div>
@@ -385,10 +393,21 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // Enter key to send message
+        // Enter key to send message, Shift+Enter for new line
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                sendMessage();
+                if (e.shiftKey) {
+                    // Shift+Enter: Add new line
+                    e.preventDefault();
+                    const start = messageInput.selectionStart;
+                    const end = messageInput.selectionEnd;
+                    const value = messageInput.value;
+                    messageInput.value = value.substring(0, start) + '\n' + value.substring(end);
+                    messageInput.selectionStart = messageInput.selectionEnd = start + 1;
+                } else {
+                    // Regular Enter: Send message
+                    sendMessage();
+                }
             }
         });
 

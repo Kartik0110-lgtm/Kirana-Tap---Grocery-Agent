@@ -202,12 +202,30 @@ class BlinkitAutomation:
             search_box.send_keys(Keys.ENTER)
             time.sleep(5)  # Wait for search results
             
-            # Try to find and click the first product
+            # Try to find and click the product (second product for fruits to avoid ads)
             try:
-                first_product = self.wait.until(
-                    EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'product') or contains(@class, 'item') or contains(@class, 'card')]"))
-                )
-                first_product.click()
+                # Check if this is a fruit (banana, apple, etc.) - click second product to avoid ads
+                item_name_lower = item['name'].lower()
+                is_fruit = any(fruit in item_name_lower for fruit in ['banana', 'apple', 'orange', 'mango', 'grapes', 'strawberry', 'kiwi', 'pear', 'peach', 'plum'])
+                
+                if is_fruit:
+                    self.logger.info(f"🍎 {item['name']} detected as fruit - selecting second product to avoid ads")
+                    # Get all products and select the second one
+                    products = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'product') or contains(@class, 'item') or contains(@class, 'card')]")
+                    if len(products) >= 2:
+                        selected_product = products[1]  # Second product (index 1)
+                        self.logger.info(f"✅ Selected second product for {item['name']}")
+                    else:
+                        selected_product = products[0]  # Fallback to first if only one exists
+                        self.logger.info(f"⚠️ Only one product found, using first for {item['name']}")
+                else:
+                    # For non-fruits, use the first product as usual
+                    selected_product = self.wait.until(
+                        EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'product') or contains(@class, 'item') or contains(@class, 'card')]"))
+                    )
+                    self.logger.info(f"✅ Selected first product for {item['name']}")
+                
+                selected_product.click()
                 self.logger.info(f"Selected product for: {item['name']}")
                 time.sleep(2)
                 
@@ -276,11 +294,22 @@ class BlinkitAutomation:
             if not self.setup_driver():
                 return False, "Failed to setup browser automation"
             
-            if not self.navigate_to_blinkit():
-                return False, "Failed to navigate to Blinkit"
-            
             # Add each item to cart
-            for item in grocery_items:
+            for i, item in enumerate(grocery_items):
+                self.logger.info(f"Processing item {i+1}/{len(grocery_items)}: {item['name']}")
+                
+                # Fresh start for each item - go to homepage
+                if i == 0:
+                    # First item - navigate to Blinkit
+                    if not self.navigate_to_blinkit():
+                        return False, "Failed to navigate to Blinkit"
+                else:
+                    # Subsequent items - go back to homepage for fresh search
+                    self.logger.info(f"Going back to homepage for item {i+1}")
+                    self.driver.get("https://blinkit.com")
+                    time.sleep(3)  # Wait for page to load
+                
+                # Search and add this item
                 self.search_and_add_item(item)
                 time.sleep(2)  # Wait between items
             
