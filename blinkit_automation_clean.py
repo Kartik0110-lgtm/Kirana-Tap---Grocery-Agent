@@ -992,24 +992,29 @@ class BlinkitAutomation:
             if not self.setup_driver():
                 return False, "Failed to setup browser automation"
             
-            if not self.navigate_to_blinkit():
-                return False, "Failed to navigate to Blinkit"
-            
-            # Add first item to cart and navigate to cart
-            if grocery_items:
-                first_item = grocery_items[0]
-                self.logger.info(f"🛒 Adding first item to cart: {first_item['name']}")
+            # Add each item to cart
+            for i, item in enumerate(grocery_items):
+                self.logger.info(f"🛒 Processing item {i+1}/{len(grocery_items)}: {item['name']}")
                 
-                if self.search_and_add_item(first_item):
-                    self.logger.info("✅ First item added and cart navigation successful!")
+                # Fresh start for each item - go to homepage
+                if i == 0:
+                    # First item - navigate to Blinkit
+                    if not self.navigate_to_blinkit():
+                        return False, "Failed to navigate to Blinkit"
                 else:
-                    self.logger.error("❌ Failed to add first item or navigate to cart")
-                    return False, "Failed to add item to cart"
+                    # Subsequent items - go back to homepage for fresh search
+                    self.logger.info(f"🔄 Going back to homepage for item {i+1}")
+                    self.driver.get("https://blinkit.com")
+                    time.sleep(3)  # Wait for page to load
                 
-                # If there are more items, add them (optional - you can modify this behavior)
-                if len(grocery_items) > 1:
-                    self.logger.info(f"📝 Note: {len(grocery_items)} items provided, but only first item was processed")
-                    self.logger.info("📝 To add multiple items, modify the automation flow as needed")
+                # Search and add this item
+                if self.search_and_add_item(item):
+                    self.logger.info(f"✅ Successfully added {item['name']} to cart")
+                else:
+                    self.logger.error(f"❌ Failed to add {item['name']} to cart")
+                    return False, f"Failed to add {item['name']} to cart"
+                
+                time.sleep(2)  # Wait between items
             
             # We should already be on the cart page from the previous step
             # But let's verify and proceed with checkout
@@ -1511,21 +1516,56 @@ class BlinkitAutomation:
             self.logger.info("⏳ Waiting for search results to load (2s buffer)...")
             time.sleep(2)
             
-            # Step 1: Find the first Add button using the exact CSS selector from Blinkit's HTML
-            self.logger.info("🔍 Looking for first Add button using exact CSS selector...")
+            # Check if this is a fruit (banana, apple, etc.) - click second product to avoid ads
+            # We need to get the item name from the current context
+            try:
+                # Try to get the item name from the page title or URL
+                page_title = driver.title.lower()
+                current_url = driver.current_url.lower()
+                
+                # Common fruits that often have sponsored results
+                fruit_keywords = ['banana', 'apple', 'orange', 'mango', 'grapes', 'strawberry', 'kiwi', 'pear', 'peach', 'plum']
+                
+                is_fruit = any(fruit in page_title or fruit in current_url for fruit in fruit_keywords)
+                
+                if is_fruit:
+                    self.logger.info(f"🍎 Fruit detected - selecting second product to avoid ads")
+                    # For fruits, we'll try to find the second Add button
+                    add_button_index = 1  # Second button (index 1)
+                else:
+                    self.logger.info(f"✅ Non-fruit item - selecting first product as usual")
+                    add_button_index = 0  # First button (index 0)
+                    
+            except Exception as e:
+                self.logger.info(f"⚠️ Could not determine item type, using first product: {e}")
+                add_button_index = 0
+            
+            # Step 1: Find the Add button using the exact CSS selector from Blinkit's HTML
+            self.logger.info(f"🔍 Looking for Add button #{add_button_index + 1} using exact CSS selector...")
             
             # The exact CSS selector based on the HTML you provided
             add_button_selector = "div.tw-rounded-md.tw-font-okra.tw-flex.tw-justify-center.tw-font-semibold.tw-items-center.tw-relative.tw-text-300.tw-py-2.tw-px-0.tw-gap-0\\.5.tw-min-w-\\[66px\\].tw-bg-green-050.tw-border.tw-border-base-green.tw-text-base-green"
             
             try:
-                # Wait for the first Add button to be clickable
-                add_button = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, add_button_selector))
+                # Find all Add buttons and select the appropriate one based on index
+                add_buttons = driver.find_elements(By.CSS_SELECTOR, add_button_selector)
+                
+                if len(add_buttons) > add_button_index:
+                    add_button = add_buttons[add_button_index]
+                    self.logger.info(f"✅ Found {len(add_buttons)} Add buttons, using button #{add_button_index + 1}")
+                else:
+                    # Fallback to first button if the desired index doesn't exist
+                    add_button = add_buttons[0]
+                    self.logger.info(f"⚠️ Desired button #{add_button_index + 1} not found, using first button instead")
+                
+                # Wait for the selected button to be clickable
+                WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable(add_button)
                 )
-                self.logger.info("✅ First Add button found and is clickable")
+                self.logger.info(f"✅ Selected Add button is clickable")
                 
             except Exception as e:
-                self.logger.warning(f"⚠️ Add button not found initially: {e}")
+                self.logger.warning(f"⚠️ Add button selection failed: {e}")
                 
                 # Fallback: Try to find all matching elements and take the first one
                 self.logger.info("🔄 Trying fallback approach - finding all Add buttons...")
