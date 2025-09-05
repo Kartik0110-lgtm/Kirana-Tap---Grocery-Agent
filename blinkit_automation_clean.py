@@ -19,14 +19,23 @@ class BlinkitAutomation:
         # Clear any existing handlers to avoid duplicate logging
         logging.getLogger().handlers.clear()
         
-        # Setup detailed logging with timestamps
+        # Setup detailed logging with timestamps and Unicode support
+        import sys
+        
+        # Create console handler with UTF-8 encoding
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        
+        # Create file handler with UTF-8 encoding
+        file_handler = logging.FileHandler('automation.log', mode='w', encoding='utf-8')
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        
+        # Configure root logger
         logging.basicConfig(
             level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.StreamHandler(),  # Console output
-                logging.FileHandler('automation.log', mode='w')  # File output
-            ]
+            handlers=[console_handler, file_handler]
         )
         
         # Set our logger to INFO level and ensure it's not filtered
@@ -41,36 +50,16 @@ class BlinkitAutomation:
     def setup_driver(self):
         """Setup Chrome driver with persistent profile for automatic login"""
         try:
-            # Check Chrome status first
-            self.logger.info("🔍 Checking Chrome status...")
-            self.check_chrome_status()
+            # OPTIMIZED: Fast startup - skip extensive debugging
+            self.logger.info("🚀 Fast startup mode - skipping detailed debugging")
             
-            # Check for existing automation Chrome processes
-            self.logger.info("🔍 Checking for existing automation Chrome processes...")
+            # Only check for existing automation Chrome processes (essential)
             if self.check_existing_automation_chrome():
                 self.logger.info("🔄 Found existing automation Chrome, cleaning up...")
                 if not self.force_close_chrome_and_cleanup():
                     self.logger.warning("⚠️ Chrome cleanup failed, continuing anyway...")
-            else:
-                self.logger.info("✅ No existing automation Chrome found, proceeding...")
             
-            # Check profile integrity and repair if needed
-            self.logger.info("🔍 Checking profile integrity...")
-            if not self.check_profile_integrity():
-                self.logger.warning("⚠️ Profile integrity check failed, attempting repair...")
-                if not self.repair_broken_profile():
-                    self.logger.error("❌ Profile repair failed")
-                    return False
-                self.logger.info("✅ Profile repaired successfully")
-            
-            # Debug any remaining profile issues
-            self.logger.info("🔍 Debugging profile issues...")
-            if not self.debug_profile_issues():
-                self.logger.warning("⚠️ Profile has issues that may affect functionality")
-                self.logger.info("💡 Consider running fix_profile.py to resolve issues")
-            
-            # Ensure profile directory is ready
-            self.logger.info("📁 Setting up Chrome profile directory...")
+            # Ensure profile directory is ready (essential)
             if not self.ensure_profile_directory():
                 self.logger.error("❌ Failed to setup profile directory")
                 return False
@@ -454,13 +443,13 @@ class BlinkitAutomation:
     def verify_profile_usage(self):
         """Verify that the Chrome profile is actually being used"""
         try:
+            import os
             if not self.driver:
                 self.logger.warning("⚠️ No driver available to verify profile")
                 return False
             
             # Check if the profile directory is being used
             profile_dir = os.path.join(os.getcwd(), "chrome-profile")
-            import os
             
             if not os.path.exists(profile_dir):
                 self.logger.warning("⚠️ Profile directory doesn't exist yet")
@@ -792,7 +781,7 @@ class BlinkitAutomation:
             
             # STEP 2: Wait for navigation to search page
             self.logger.info("🔍 STEP 2: Waiting for navigation to search page...")
-            time.sleep(5)  # Wait for page navigation
+            time.sleep(2)  # OPTIMIZED: Reduced wait for page navigation
             
             # Check if we're on the search page
             current_url = self.driver.current_url
@@ -800,7 +789,7 @@ class BlinkitAutomation:
             
             if '/s/' not in current_url:
                 self.logger.warning("⚠️ Not redirected to search page, waiting longer...")
-                time.sleep(5)
+                time.sleep(2)  # OPTIMIZED: Reduced wait
                 current_url = self.driver.current_url
                 self.logger.info(f"Current URL after additional wait: {current_url}")
             
@@ -885,7 +874,7 @@ class BlinkitAutomation:
                     self.driver.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));", search_input)
                     self.logger.info("✅ JavaScript Enter key successful")
                 
-                time.sleep(5)  # Wait for search results
+                time.sleep(2)  # OPTIMIZED: Reduced wait for search results
                 self.logger.info(f"✅ Successfully searched for: {query}")
                 return True
                 
@@ -905,7 +894,7 @@ class BlinkitAutomation:
             
             # Wait for page to fully load
             self.logger.info("⏳ Waiting for page to fully load...")
-            time.sleep(5)  # Reduced wait time since location detection is removed
+            time.sleep(2)  # OPTIMIZED: Further reduced wait time
             
             # Debug: Log current page state
             self.logger.info(f"📄 Current page title: {self.driver.title}")
@@ -925,9 +914,7 @@ class BlinkitAutomation:
             self.logger.info("⏳ Waiting for search results to load...")
             time.sleep(1)
             
-            # DEBUG: Let's see what's actually on the search results page (FAST)
-            self.logger.info("🔍 DEBUGGING: Analyzing search results page (FAST)...")
-            self.debug_search_results_page()
+            # OPTIMIZED: Skip debugging for faster performance
             
             # Use the OPTIMIZED cart addition function
             self.logger.info("🛒 STEP 2: Adding item to cart...")
@@ -935,16 +922,8 @@ class BlinkitAutomation:
             
             if cart_success:
                 self.logger.info(f"🎉 Successfully added {item['name']} to cart!")
-                
-                # After successfully adding item to cart, navigate to cart instead of continuing to search
-                self.logger.info("🛒 Item added successfully! Now navigating to cart for checkout...")
-                if self.navigate_to_cart():
-                    self.logger.info("✅ Successfully navigated to cart - ready for checkout!")
-                    self.logger.info("🎯 Item search and add process completed successfully!")
-                    return True  # Return success to indicate we should proceed to checkout
-                else:
-                    self.logger.warning("⚠️ Failed to navigate to cart, but item was added")
-                    return False
+                self.logger.info("🎯 Item search and add process completed successfully!")
+                return True  # Return success to indicate item was added
             else:
                 self.logger.error(f"❌ Failed to add {item['name']} to cart")
                 return False
@@ -986,38 +965,86 @@ class BlinkitAutomation:
             self.logger.error(f"Error checking alternatives: {e}")
             return []
     
+    def search_next_item(self, item):
+        """Search for next item by clearing search bar and searching again"""
+        try:
+            self.logger.info(f"🛒 Starting search for next item: {item['name']}")
+            
+            # Find the search bar using the provided selector
+            search_bar_selector = "//input[contains(@class, 'SearchBarContainer__Input')]"
+            search_box = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, search_bar_selector))
+            )
+            
+            # Clear the search bar
+            self.logger.info("🧹 Clearing search bar...")
+            search_box.clear()
+            time.sleep(1)
+            
+            # Type the new item name
+            self.logger.info(f"⌨️ Typing new item: {item['name']}")
+            search_box.send_keys(item['name'])
+            time.sleep(1)
+            
+            # Press Enter to search
+            search_box.send_keys(Keys.ENTER)
+            time.sleep(2)  # OPTIMIZED: Reduced wait for search results
+            
+            # Use the same cart addition logic as the main function
+            self.logger.info("🛒 Adding item to cart...")
+            cart_success = self.add_first_item_to_cart(self.driver, timeout=10)
+            
+            if cart_success:
+                self.logger.info(f"🎉 Successfully added {item['name']} to cart!")
+                return True
+            else:
+                self.logger.error(f"❌ Failed to add {item['name']} to cart")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error in search_next_item process: {e}")
+            return False
+    
     def place_order(self, grocery_items):
         """Main function to place the complete order"""
         try:
             if not self.setup_driver():
                 return False, "Failed to setup browser automation"
             
-            # Add each item to cart
+            # Navigate to Blinkit once for the first item
+            if not self.navigate_to_blinkit():
+                return False, "Failed to navigate to Blinkit"
+            
+            # Add each item to cart using search bar
             for i, item in enumerate(grocery_items):
                 self.logger.info(f"🛒 Processing item {i+1}/{len(grocery_items)}: {item['name']}")
                 
-                # Fresh start for each item - go to homepage
                 if i == 0:
-                    # First item - navigate to Blinkit
-                    if not self.navigate_to_blinkit():
-                        return False, "Failed to navigate to Blinkit"
+                    # First item - search and add
+                    if self.search_and_add_item(item):
+                        self.logger.info(f"✅ Successfully added {item['name']} to cart")
+                    else:
+                        self.logger.error(f"❌ Failed to add {item['name']} to cart")
+                        return False, f"Failed to add {item['name']} to cart"
                 else:
-                    # Subsequent items - go back to homepage for fresh search
-                    self.logger.info(f"🔄 Going back to homepage for item {i+1}")
-                    self.driver.get("https://blinkit.com")
-                    time.sleep(3)  # Wait for page to load
-                
-                # Search and add this item
-                if self.search_and_add_item(item):
-                    self.logger.info(f"✅ Successfully added {item['name']} to cart")
-                else:
-                    self.logger.error(f"❌ Failed to add {item['name']} to cart")
-                    return False, f"Failed to add {item['name']} to cart"
+                    # Subsequent items - clear search bar and search for next item
+                    self.logger.info(f"🔄 Clearing search bar and searching for item {i+1}")
+                    if self.search_next_item(item):
+                        self.logger.info(f"✅ Successfully added {item['name']} to cart")
+                    else:
+                        self.logger.error(f"❌ Failed to add {item['name']} to cart")
+                        return False, f"Failed to add {item['name']} to cart"
                 
                 time.sleep(2)  # Wait between items
             
-            # We should already be on the cart page from the previous step
-            # But let's verify and proceed with checkout
+            # All items added, now navigate to cart for checkout
+            self.logger.info("🛒 All items added! Now navigating to cart for checkout...")
+            if self.navigate_to_cart():
+                self.logger.info("✅ Successfully navigated to cart - ready for checkout!")
+            else:
+                self.logger.warning("⚠️ Failed to navigate to cart, but proceeding with checkout attempt")
+            
+            # Proceed with checkout
             try:
                 # Checkout process - Click "Proceed To Pay" button
                 self.logger.info("🔍 Looking for 'Proceed To Pay' button on checkout page...")
@@ -1523,8 +1550,14 @@ class BlinkitAutomation:
                 page_title = driver.title.lower()
                 current_url = driver.current_url.lower()
                 
-                # Common fruits that often have sponsored results
-                fruit_keywords = ['banana', 'apple', 'orange', 'mango', 'grapes', 'strawberry', 'kiwi', 'pear', 'peach', 'plum']
+                # Comprehensive fruit list including common fruits that often have sponsored results
+                fruit_keywords = [
+                    'banana', 'apple', 'orange', 'mango', 'grapes', 'strawberry', 'kiwi', 'pear', 'peach', 'plum',
+                    'guava', 'papaya', 'pineapple', 'watermelon', 'pomegranate', 'cherry', 'blueberry', 'raspberry',
+                    'blackberry', 'cranberry', 'lemon', 'lime', 'coconut', 'avocado', 'fig', 'date', 'apricot',
+                    'nectarine', 'cantaloupe', 'honeydew', 'dragon fruit', 'passion fruit', 'lychee', 'jackfruit',
+                    'custard apple', 'sapodilla', 'jamun', 'chikoo', 'wood apple', 'star fruit', 'persimmon'
+                ]
                 
                 is_fruit = any(fruit in page_title or fruit in current_url for fruit in fruit_keywords)
                 

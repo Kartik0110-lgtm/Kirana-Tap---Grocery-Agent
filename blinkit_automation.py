@@ -204,9 +204,99 @@ class BlinkitAutomation:
             
             # Try to find and click the product (second product for fruits to avoid ads)
             try:
-                # Check if this is a fruit (banana, apple, etc.) - click second product to avoid ads
+                # Check if this is a fruit - click second product to avoid ads
                 item_name_lower = item['name'].lower()
-                is_fruit = any(fruit in item_name_lower for fruit in ['banana', 'apple', 'orange', 'mango', 'grapes', 'strawberry', 'kiwi', 'pear', 'peach', 'plum'])
+                # Comprehensive fruit list including common fruits that often have sponsored results
+                fruit_keywords = [
+                    'banana', 'apple', 'orange', 'mango', 'grapes', 'strawberry', 'kiwi', 'pear', 'peach', 'plum',
+                    'guava', 'papaya', 'pineapple', 'watermelon', 'pomegranate', 'cherry', 'blueberry', 'raspberry',
+                    'blackberry', 'cranberry', 'lemon', 'lime', 'coconut', 'avocado', 'fig', 'date', 'apricot',
+                    'nectarine', 'cantaloupe', 'honeydew', 'dragon fruit', 'passion fruit', 'lychee', 'jackfruit',
+                    'custard apple', 'sapodilla', 'jamun', 'chikoo', 'wood apple', 'star fruit', 'persimmon'
+                ]
+                is_fruit = any(fruit in item_name_lower for fruit in fruit_keywords)
+                
+                if is_fruit:
+                    self.logger.info(f"🍎 {item['name']} detected as fruit - selecting second product to avoid ads")
+                    # Get all products and select the second one
+                    products = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'product') or contains(@class, 'item') or contains(@class, 'card')]")
+                    if len(products) >= 2:
+                        selected_product = products[1]  # Second product (index 1)
+                        self.logger.info(f"✅ Selected second product for {item['name']}")
+                    else:
+                        selected_product = products[0]  # Fallback to first if only one exists
+                        self.logger.info(f"⚠️ Only one product found, using first for {item['name']}")
+                else:
+                    # For non-fruits, use the first product as usual
+                    selected_product = self.wait.until(
+                        EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'product') or contains(@class, 'item') or contains(@class, 'card')]"))
+                    )
+                    self.logger.info(f"✅ Selected first product for {item['name']}")
+                
+                selected_product.click()
+                self.logger.info(f"Selected product for: {item['name']}")
+                time.sleep(2)
+                
+                # Try to add to cart
+                try:
+                    add_to_cart_btn = self.wait.until(
+                        EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Add') or contains(@class, 'add') or contains(@data-testid, 'add')]"))
+                    )
+                    add_to_cart_btn.click()
+                    self.logger.info(f"Added {item['name']} to cart")
+                    time.sleep(2)
+                    
+                    # Close product modal if it appears
+                    try:
+                        close_btn = self.driver.find_element(By.XPATH, "//button[contains(@class, 'close') or contains(@aria-label, 'Close') or .//*[contains(@class, 'close')]]")
+                        close_btn.click()
+                        time.sleep(1)
+                    except:
+                        pass
+                        
+                except Exception as e:
+                    self.logger.warning(f"Could not add {item['name']} to cart: {e}")
+                    
+            except Exception as e:
+                self.logger.warning(f"Could not select product for {item['name']}: {e}")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to search for {item['name']}: {e}")
+    
+    def search_next_item(self, item):
+        """Search for next item by clearing search bar and searching again"""
+        try:
+            # Find the search bar using the provided selector
+            search_bar_selector = "//input[contains(@class, 'SearchBarContainer__Input')]"
+            search_box = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, search_bar_selector))
+            )
+            
+            # Clear the search bar
+            search_box.clear()
+            time.sleep(1)
+            
+            # Type the new item name
+            search_box.send_keys(item['name'])
+            time.sleep(1)
+            
+            # Press Enter to search
+            search_box.send_keys(Keys.ENTER)
+            time.sleep(5)  # Wait for search results
+            
+            # Try to find and click the product (second product for fruits to avoid ads)
+            try:
+                # Check if this is a fruit - click second product to avoid ads
+                item_name_lower = item['name'].lower()
+                # Comprehensive fruit list including common fruits that often have sponsored results
+                fruit_keywords = [
+                    'banana', 'apple', 'orange', 'mango', 'grapes', 'strawberry', 'kiwi', 'pear', 'peach', 'plum',
+                    'guava', 'papaya', 'pineapple', 'watermelon', 'pomegranate', 'cherry', 'blueberry', 'raspberry',
+                    'blackberry', 'cranberry', 'lemon', 'lime', 'coconut', 'avocado', 'fig', 'date', 'apricot',
+                    'nectarine', 'cantaloupe', 'honeydew', 'dragon fruit', 'passion fruit', 'lychee', 'jackfruit',
+                    'custard apple', 'sapodilla', 'jamun', 'chikoo', 'wood apple', 'star fruit', 'persimmon'
+                ]
+                is_fruit = any(fruit in item_name_lower for fruit in fruit_keywords)
                 
                 if is_fruit:
                     self.logger.info(f"🍎 {item['name']} detected as fruit - selecting second product to avoid ads")
@@ -294,23 +384,22 @@ class BlinkitAutomation:
             if not self.setup_driver():
                 return False, "Failed to setup browser automation"
             
-            # Add each item to cart
+            # Navigate to Blinkit once for the first item
+            if not self.navigate_to_blinkit():
+                return False, "Failed to navigate to Blinkit"
+            
+            # Add each item to cart using search bar
             for i, item in enumerate(grocery_items):
                 self.logger.info(f"Processing item {i+1}/{len(grocery_items)}: {item['name']}")
                 
-                # Fresh start for each item - go to homepage
                 if i == 0:
-                    # First item - navigate to Blinkit
-                    if not self.navigate_to_blinkit():
-                        return False, "Failed to navigate to Blinkit"
+                    # First item - search and add
+                    self.search_and_add_item(item)
                 else:
-                    # Subsequent items - go back to homepage for fresh search
-                    self.logger.info(f"Going back to homepage for item {i+1}")
-                    self.driver.get("https://blinkit.com")
-                    time.sleep(3)  # Wait for page to load
+                    # Subsequent items - clear search bar and search for next item
+                    self.logger.info(f"Clearing search bar and searching for item {i+1}")
+                    self.search_next_item(item)
                 
-                # Search and add this item
-                self.search_and_add_item(item)
                 time.sleep(2)  # Wait between items
             
             # Navigate to cart using the exact cart button element
