@@ -1,0 +1,20 @@
+warning: in the working copy of 'blinkit_automation_clean.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Extension State/LOG', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Extension State/LOG.old', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/GCM Store/LOG', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/GCM Store/LOG.old', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Local Storage/leveldb/LOG', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Local Storage/leveldb/LOG.old', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Service Worker/Database/LOG', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Service Worker/Database/LOG.old', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Session Storage/LOG', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Session Storage/LOG.old', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Site Characteristics Database/LOG', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Site Characteristics Database/LOG.old', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Sync Data/LevelDB/LOG', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/Sync Data/LevelDB/LOG.old', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/shared_proto_db/LOG', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/shared_proto_db/LOG.old', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/shared_proto_db/metadata/LOG', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/Default/shared_proto_db/metadata/LOG.old', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'chrome-profile/DevToolsActivePort', LF will be replaced by CRLF the next time Git touches it
