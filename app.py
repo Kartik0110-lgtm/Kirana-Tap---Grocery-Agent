@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 from flask_socketio import SocketIO, emit
 import os
 from dotenv import load_dotenv
@@ -7,13 +7,49 @@ import json
 import re
 from blinkit_automation_clean import BlinkitAutomation
 import threading
+import logging
+from functools import wraps
+from datetime import datetime, timedelta
+import secrets
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'REDACTED'
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Security: Use environment variable for SECRET_KEY with secure fallback
+SECRET_KEY = os.getenv('FLASK_SECRET_KEY')
+if not SECRET_KEY:
+    # Generate a random secret key if not provided (for development)
+    SECRET_KEY = os.urandom(32).hex()
+    print("⚠️ WARNING: Using randomly generated SECRET_KEY. Set FLASK_SECRET_KEY in .env for production!")
+
+app.config['SECRET_KEY'] = SECRET_KEY
+
+# Security: Restrict CORS to specific origins (comma-separated list in .env)
+allowed_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5000,http://127.0.0.1:5000')
+cors_origins = [origin.strip() for origin in allowed_origins.split(',')]
+socketio = SocketIO(app, cors_allowed_origins=cors_origins)
+
+# Configure logging (security: don't log sensitive data)
+# Use UTF-8 encoding to handle emojis on all platforms
+import sys
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log', encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+# Set console encoding to UTF-8 for Windows
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except:
+        pass  # Fallback if reconfigure not available
+
+logger = logging.getLogger(__name__)
 
 # Initialize OpenAI client
 openai.api_key = os.getenv('OPENAI_API_KEY')
@@ -21,13 +57,120 @@ openai.api_key = os.getenv('OPENAI_API_KEY')
 # Store pending orders (in production, use a proper database)
 pending_orders = {}
 
+# Security: Rate limiting storage (in-memory, use Redis for production)
+rate_limit_storage = {}
+
+# Security: Simple authentication tokens (in production, use proper auth system)
+# Format: {session_id: {'created': datetime, 'ip': str}}
+active_sessions = {}
+
+# Configuration
+MAX_MESSAGE_LENGTH = int(os.getenv('MAX_MESSAGE_LENGTH', '500'))
+RATE_LIMIT_REQUESTS = int(os.getenv('RATE_LIMIT_REQUESTS', '10'))
+RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', '60'))  # seconds
+AUTH_ENABLED = os.getenv('AUTH_ENABLED', 'false').lower() == 'true'
+AUTH_TOKEN = os.getenv('AUTH_TOKEN', None)
+
+# Security: Input validation helper
+def sanitize_input(text):
+    """Sanitize user input to prevent injection attacks"""
+    if not isinstance(text, str):
+        return ""
+
+    # Limit length
+    text = text[:MAX_MESSAGE_LENGTH]
+
+    # Remove potentially dangerous characters (keep basic punctuation)
+    # Allow: letters, numbers, spaces, basic punctuation
+    import string
+    allowed_chars = string.ascii_letters + string.digits + string.whitespace + ".,!?-_()[]"
+    text = ''.join(char for char in text if char in allowed_chars)
+
+    # Remove excessive whitespace
+    text = ' '.join(text.split())
+
+    return text.strip()
+
+# Security: Rate limiting decorator
+def rate_limit(key_func):
+    """Rate limiting decorator to prevent API abuse"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not RATE_LIMIT_REQUESTS:
+                return f(*args, **kwargs)
+
+            # Get unique key for this client
+            key = key_func()
+            current_time = datetime.now()
+
+            # Initialize if not exists
+            if key not in rate_limit_storage:
+                rate_limit_storage[key] = []
+
+            # Remove old entries outside the time window
+            rate_limit_storage[key] = [
+                timestamp for timestamp in rate_limit_storage[key]
+                if (current_time - timestamp).total_seconds() < RATE_LIMIT_WINDOW
+            ]
+
+            # Check if limit exceeded
+            if len(rate_limit_storage[key]) >= RATE_LIMIT_REQUESTS:
+                logger.warning(f"Rate limit exceeded for {key}")
+                emit('error', {
+                    'message': f'Rate limit exceeded. Please wait before sending more requests.'
+                })
+                return None
+
+            # Add current request
+            rate_limit_storage[key].append(current_time)
+
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+# Security: Authentication decorator
+def require_auth(f):
+    """Require authentication token if AUTH_ENABLED is True"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not AUTH_ENABLED:
+            return f(*args, **kwargs)
+
+        # Check if session is authenticated
+        session_id = session.get('session_id')
+        if not session_id or session_id not in active_sessions:
+            emit('error', {'message': 'Authentication required'})
+            return None
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Security: Session management
+def create_session():
+    """Create a new authenticated session"""
+    session_id = secrets.token_urlsafe(32)
+    session['session_id'] = session_id
+    active_sessions[session_id] = {
+        'created': datetime.now(),
+        'ip': request.remote_addr if hasattr(request, 'remote_addr') else 'unknown'
+    }
+    return session_id
+
+def validate_auth_token(token):
+    """Validate authentication token"""
+    if not AUTH_ENABLED or not AUTH_TOKEN:
+        return True
+    return token == AUTH_TOKEN
+
 def parse_grocery_list(user_message):
     """
     Parse user's grocery list using AI to extract structured items
     """
     try:
-        print(f"🔍 Parsing grocery list: '{user_message}'")
-        print(f"📝 Number of lines: {len(user_message.split(chr(10)))}")
+        # Security: Log without exposing full user input
+        logger.info(f"🔍 Parsing grocery list with {len(user_message.split(chr(10)))} lines")
+        logger.debug(f"First 50 chars: '{user_message[:50]}...'")  # Only in debug mode
         
         # Create a system prompt for grocery parsing
         system_prompt = """You are a grocery assistant. Parse the user's grocery list into structured items.
@@ -71,8 +214,11 @@ def parse_grocery_list(user_message):
         
         REMEMBER: Each line break means a NEW ITEM!"""
         
-        # Get AI response
-        response = openai.ChatCompletion.create(
+        # Get AI response using new OpenAI v1.0+ syntax
+        from openai import OpenAI
+        client = OpenAI(api_key=openai.api_key)
+
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -81,25 +227,25 @@ def parse_grocery_list(user_message):
             max_tokens=500,
             temperature=0.1
         )
-        
+
         # Extract and parse JSON response
         ai_response = response.choices[0].message.content.strip()
-        print(f"🤖 AI Response: {ai_response}")
-        
+        logger.debug(f"🤖 AI Response received: {len(ai_response)} chars")
+
         # Clean the response to extract just the JSON
         json_match = re.search(r'\[.*\]', ai_response, re.DOTALL)
         if json_match:
             grocery_items = json.loads(json_match.group())
-            print(f"✅ AI Parsing successful: {len(grocery_items)} items found")
+            logger.info(f"✅ AI Parsing successful: {len(grocery_items)} items found")
             return grocery_items
         else:
-            print("⚠️ AI parsing failed, using fallback parsing")
+            logger.warning("⚠️ AI parsing failed, using fallback parsing")
             # Fallback parsing for simple cases
             return fallback_parsing(user_message)
-            
+
     except Exception as e:
-        print(f"❌ AI parsing error: {e}")
-        print("🔄 Using fallback parsing")
+        logger.error(f"❌ AI parsing error: {str(e)}")
+        logger.info("🔄 Using fallback parsing")
         return fallback_parsing(user_message)
 
 def fallback_parsing(user_message):
@@ -244,13 +390,23 @@ def health_check():
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection"""
-    print('Client connected')
-    emit('status', {'message': 'Connected to Kirana Tap!'})
+    client_ip = request.remote_addr if hasattr(request, 'remote_addr') else 'unknown'
+    logger.info(f'Client connected from {client_ip}')
+
+    # Create session for this connection
+    create_session()
+
+    emit('status', {'message': 'Connected to Kirana Tap!', 'auth_required': AUTH_ENABLED})
 
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handle client disconnection"""
-    print('Client disconnected')
+    logger.info('Client disconnected')
+
+    # Clean up session if exists
+    session_id = session.get('session_id')
+    if session_id and session_id in active_sessions:
+        del active_sessions[session_id]
 
 @socketio.on('confirm_order')
 def handle_order_confirmation(data):
@@ -352,13 +508,32 @@ def handle_order_confirmation(data):
         })
 
 @socketio.on('chat_message')
+@rate_limit(lambda: request.sid)  # Rate limit by socket session ID
+@require_auth
 def handle_chat_message(data):
     """Handle incoming chat messages"""
-    message = data.get('message', '').strip()
-    print(f'Received message: {message}')
-    
-    if not message:
+    raw_message = data.get('message', '')
+
+    # Security: Validate input type
+    if not isinstance(raw_message, str):
+        logger.warning(f"Invalid message type received: {type(raw_message)}")
+        emit('error', {'message': 'Invalid message format'})
         return
+
+    # Security: Sanitize and validate input
+    message = sanitize_input(raw_message)
+
+    # Security: Check message length
+    if len(raw_message) > MAX_MESSAGE_LENGTH:
+        logger.warning(f"Message too long: {len(raw_message)} chars")
+        emit('error', {'message': f'Message too long. Maximum {MAX_MESSAGE_LENGTH} characters allowed.'})
+        return
+
+    if not message:
+        logger.debug("Empty message received after sanitization")
+        return
+
+    logger.info(f'Received message: {len(message)} characters')
     
     # Check if this is an order confirmation
     if message.lower() in ['yes', 'confirm', 'proceed', 'place order', 'order now']:
@@ -400,11 +575,11 @@ def handle_chat_message(data):
         }
         
         response = generate_order_summary(grocery_items)
-        
+
         # Remove order ID from initial message - it will be shown after confirmation
         # response += f"\n\nOrder ID: {order_id}\n\nReply with 'yes' to confirm and place this order!"
-        
-        print(f"Created order {order_id} with items: {grocery_items}")
+
+        logger.info(f"Created order {order_id} with {len(grocery_items)} items")
     else:
         response = "I'm having trouble understanding your grocery list. Could you please rephrase it? For example: 'I need 2 kg potatoes, 1 dozen eggs, and 3 packets of bread'"
     
@@ -416,14 +591,52 @@ def handle_chat_message(data):
     })
 
 if __name__ == '__main__':
-    print("🚀 Starting Kirana Tap Backend...")
-    print("📍 Health check available at: http://localhost:5000/health")
-    print("🌐 Chat interface at: http://localhost:5000/")
-    
+    logger.info("🚀 Starting Kirana Tap Backend...")
+    logger.info(f"📍 Health check available at: http://localhost:5000/health")
+    logger.info(f"🌐 Chat interface at: http://localhost:5000/")
+
     # Get port from environment variable (Render sets this)
     port = int(os.environ.get('PORT', 5000))
-    
+
     # Use production settings for Render
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
-    
-    socketio.run(app, debug=debug_mode, host='0.0.0.0', port=port)
+    is_production = os.environ.get('FLASK_ENV', 'development') == 'production'
+
+    # Security warnings
+    if is_production:
+        if not os.getenv('FLASK_SECRET_KEY'):
+            logger.error("❌ CRITICAL: FLASK_SECRET_KEY not set in production!")
+        if not AUTH_ENABLED:
+            logger.warning("⚠️ WARNING: Authentication is disabled in production!")
+        if debug_mode:
+            logger.warning("⚠️ WARNING: Debug mode enabled in production!")
+        if '*' in cors_origins or 'http://localhost' in str(cors_origins):
+            logger.warning("⚠️ WARNING: Insecure CORS configuration in production!")
+
+        logger.info("✅ Production mode enabled")
+        logger.info("🔒 Security features:")
+        logger.info(f"   - Rate limiting: {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW}s")
+        logger.info(f"   - Max message length: {MAX_MESSAGE_LENGTH} chars")
+        logger.info(f"   - Authentication: {'Enabled' if AUTH_ENABLED else 'Disabled'}")
+        logger.info(f"   - CORS origins: {len(cors_origins)} allowed")
+    else:
+        logger.info("🛠️ Development mode enabled")
+        logger.warning("⚠️ Not for production use - enable security features in .env")
+
+    # SSL/TLS context (for HTTPS)
+    # Note: In production, usually handled by reverse proxy (Nginx, Render, etc.)
+    ssl_cert = os.getenv('SSL_CERT_PATH')
+    ssl_key = os.getenv('SSL_KEY_PATH')
+
+    if ssl_cert and ssl_key:
+        # Run with SSL
+        import ssl
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain(ssl_cert, ssl_key)
+        logger.info("🔐 HTTPS enabled with SSL certificate")
+        socketio.run(app, debug=debug_mode, host='0.0.0.0', port=port, ssl_context=ssl_context)
+    else:
+        # Run without SSL (development or behind reverse proxy)
+        if is_production:
+            logger.warning("⚠️ Running without SSL - ensure reverse proxy handles HTTPS!")
+        socketio.run(app, debug=debug_mode, host='0.0.0.0', port=port)

@@ -1,22 +1,84 @@
+# ============================================================================
 # Environment Variables Template for Kirana Tap AI Grocery Assistant
-# Copy this file to .env and fill in your actual values
+# ============================================================================
+# IMPORTANT: Copy this file to .env and fill in your actual values
+# DO NOT commit .env to version control (it's in .gitignore)
+# ============================================================================
 
-# OpenAI API Configuration
+# ----------------------------------------------------------------------------
+# REQUIRED: OpenAI API Configuration
+# ----------------------------------------------------------------------------
 # Get your API key from: https://platform.openai.com/api-keys
+# WARNING: Keep this secret! Never share or commit to Git
 OPENAI_API_KEY=your_openai_api_key_here
 
+# ----------------------------------------------------------------------------
+# REQUIRED: Security Configuration
+# ----------------------------------------------------------------------------
+# Flask secret key for session encryption
+# PRODUCTION: Generate a secure random key using: python -c "import os; print(os.urandom(32).hex())"
+# DEVELOPMENT: Any random string works
+FLASK_SECRET_KEY=your_very_long_random_secret_key_here_at_least_32_characters
+
+# CORS (Cross-Origin Resource Sharing) allowed origins
+# Comma-separated list of allowed origins
+# DEVELOPMENT: Use localhost
+# PRODUCTION: Use your actual domain(s)
+CORS_ALLOWED_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
+
+# ----------------------------------------------------------------------------
 # Flask Configuration
+# ----------------------------------------------------------------------------
 FLASK_ENV=development
 FLASK_DEBUG=True
 
-# Optional: Custom port
+# Custom port (optional, default: 5000)
 PORT=5000
 
-# Optional: Flask secret key for sessions
-FLASK_SECRET_KEY=your_secret_key_here
+# ----------------------------------------------------------------------------
+# Security: Rate Limiting
+# ----------------------------------------------------------------------------
+# Maximum number of requests per time window
+RATE_LIMIT_REQUESTS=10
 
-# Optional: Database configuration (if using database)
-# DATABASE_URL=your_database_url_here
+# Time window in seconds (60 = 1 minute)
+RATE_LIMIT_WINDOW=60
 
-# Optional: Logging level
+# Maximum message length (characters)
+MAX_MESSAGE_LENGTH=500
+
+# ----------------------------------------------------------------------------
+# Security: Authentication (Optional)
+# ----------------------------------------------------------------------------
+# Enable authentication (true/false)
+# Set to 'true' for production environments
+AUTH_ENABLED=false
+
+# Authentication token (only used if AUTH_ENABLED=true)
+# Generate using: python -c "import secrets; print(secrets.token_urlsafe(32))"
+AUTH_TOKEN=
+
+# ----------------------------------------------------------------------------
+# Optional: Database Configuration
+# ----------------------------------------------------------------------------
+# For future use when implementing persistent storage
+# DATABASE_URL=postgresql://user:password@localhost:5432/kirana_tap
+
+# ----------------------------------------------------------------------------
+# Logging Configuration
+# ----------------------------------------------------------------------------
 LOG_LEVEL=INFO
+
+# ----------------------------------------------------------------------------
+# Production Deployment Notes
+# ----------------------------------------------------------------------------
+# When deploying to production (e.g., Render, Heroku, AWS):
+# 1. Set FLASK_ENV=production
+# 2. Set FLASK_DEBUG=False
+# 3. Generate new FLASK_SECRET_KEY (don't use default)
+# 4. Update CORS_ALLOWED_ORIGINS to your domain(s)
+# 5. Enable AUTH_ENABLED=true
+# 6. Set strong AUTH_TOKEN
+# 7. Consider using a real database (set DATABASE_URL)
+# 8. Set up HTTPS/SSL (usually automatic on platforms like Render)
+# ============================================================================

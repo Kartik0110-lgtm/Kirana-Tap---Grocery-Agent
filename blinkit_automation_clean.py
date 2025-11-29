@@ -525,14 +525,73 @@ class BlinkitAutomation:
             self.logger.error(f"❌ Failed to ensure profile directory: {e}")
             return False
     
+    def close_popups_and_modals(self):
+        """Close any popups, modals, or overlays that might be blocking the page"""
+        try:
+            # Common selectors for Blinkit popups and modals
+            popup_selectors = [
+                # Modal close buttons
+                "//button[contains(@class, 'close') or contains(@class, 'Close')]",
+                "//div[contains(@class, 'close') or contains(@class, 'Close')]",
+                # Modal overlays (click to close)
+                "//div[contains(@class, 'modal-overlay') or contains(@class, 'Modal')]",
+                "//div[contains(@class, 'overlay')]",
+                # Specific Blinkit modals
+                "//div[contains(@class, 'ReactModal__Overlay')]",
+                # Close icons
+                "//button[@aria-label='Close']",
+                "//button[@aria-label='close']",
+                # X buttons
+                "//button[text()='×']",
+                "//span[text()='×']"
+            ]
+
+            closed_any = False
+            for selector in popup_selectors:
+                try:
+                    elements = self.driver.find_elements(By.XPATH, selector)
+                    if elements:
+                        for element in elements:
+                            try:
+                                if element.is_displayed():
+                                    element.click()
+                                    self.logger.info(f"✅ Closed popup/modal using selector: {selector}")
+                                    closed_any = True
+                                    time.sleep(0.5)
+                                    break
+                            except:
+                                pass
+                except:
+                    pass
+
+            # Also try pressing Escape key to close modals
+            try:
+                from selenium.webdriver.common.keys import Keys
+                from selenium.webdriver.common.action_chains import ActionChains
+                actions = ActionChains(self.driver)
+                actions.send_keys(Keys.ESCAPE).perform()
+                if not closed_any:
+                    self.logger.info("🔑 Pressed ESC to close any modals")
+                time.sleep(0.5)
+            except:
+                pass
+
+            return True
+        except Exception as e:
+            self.logger.debug(f"Popup closing attempt: {e}")
+            return False
+
     def navigate_to_blinkit(self):
         """Navigate to Blinkit website and check login status (location handling removed)"""
         try:
             self.driver.get("https://blinkit.com")
             self.logger.info("Navigated to Blinkit website")
-            
+
             # Wait for page to load
             time.sleep(5)
+
+            # Close any popups or modals that might be blocking
+            self.close_popups_and_modals()
             
             # Check if user is already logged in
             if self.is_user_logged_in():
@@ -746,7 +805,12 @@ class BlinkitAutomation:
         """
         try:
             self.logger.info(f"🔍 Starting search for: {query}")
-            
+
+            # STEP 0: Close any popups or modals that might be blocking
+            self.logger.info("🔍 STEP 0: Closing any popups/modals...")
+            self.close_popups_and_modals()
+            time.sleep(1)
+
             # STEP 1: Find and click the fake search bar (anchor tag)
             self.logger.info("🔍 STEP 1: Looking for the fake search bar...")
             
@@ -1573,15 +1637,52 @@ class BlinkitAutomation:
                 self.logger.info(f"⚠️ Could not determine item type, using first product: {e}")
                 add_button_index = 0
             
-            # Step 1: Find the Add button using the exact CSS selector from Blinkit's HTML
-            self.logger.info(f"🔍 Looking for Add button #{add_button_index + 1} using exact CSS selector...")
-            
-            # The exact CSS selector based on the HTML you provided
-            add_button_selector = "div.tw-rounded-md.tw-font-okra.tw-flex.tw-justify-center.tw-font-semibold.tw-items-center.tw-relative.tw-text-300.tw-py-2.tw-px-0.tw-gap-0\\.5.tw-min-w-\\[66px\\].tw-bg-green-050.tw-border.tw-border-base-green.tw-text-base-green"
-            
+            # Step 1: Find the Add button using multiple selectors (Blinkit changes their HTML frequently)
+            self.logger.info(f"🔍 Looking for Add button #{add_button_index + 1}...")
+
+            # Multiple selectors to try (in order of preference)
+            add_button_selectors = [
+                # Current Blinkit selector (as of 2024)
+                "div.tw-rounded-md.tw-font-okra.tw-flex.tw-justify-center.tw-font-semibold.tw-items-center.tw-relative.tw-text-300.tw-py-2.tw-px-0.tw-gap-0\\.5.tw-min-w-\\[66px\\].tw-bg-green-050.tw-border.tw-border-base-green.tw-text-base-green",
+                # Shorter variations
+                "div.tw-bg-green-050.tw-text-base-green",
+                "div[class*='tw-bg-green'][class*='tw-text-base-green']",
+                # Generic "Add" button patterns
+                "button:contains('Add')",
+                "div:contains('Add')[class*='tw-']",
+                # XPath fallbacks
+                "//div[contains(text(), 'Add') and contains(@class, 'tw-')]",
+                "//button[contains(text(), 'Add')]",
+                "//div[contains(@class, 'Product')]//*[contains(text(), 'Add')]"
+            ]
+
+            add_buttons = []
+            successful_selector = None
+
+            for selector in add_button_selectors:
+                try:
+                    # Determine if it's CSS or XPath
+                    if selector.startswith('//'):
+                        elements = driver.find_elements(By.XPATH, selector)
+                    else:
+                        elements = driver.find_elements(By.CSS_SELECTOR, selector)
+
+                    if elements:
+                        add_buttons = elements
+                        successful_selector = selector
+                        self.logger.info(f"✅ Found {len(add_buttons)} Add buttons using: {selector[:50]}...")
+                        break
+                except Exception as e:
+                    self.logger.debug(f"Selector failed: {selector[:50]}...")
+                    continue
+
+            if not add_buttons:
+                self.logger.error("❌ No Add buttons found with any selector")
+                return False
+
             try:
                 # Find all Add buttons and select the appropriate one based on index
-                add_buttons = driver.find_elements(By.CSS_SELECTOR, add_button_selector)
+                # add_buttons already populated above
                 
                 if len(add_buttons) > add_button_index:
                     add_button = add_buttons[add_button_index]
@@ -1596,24 +1697,12 @@ class BlinkitAutomation:
                     EC.element_to_be_clickable(add_button)
                 )
                 self.logger.info(f"✅ Selected Add button is clickable")
-                
+
             except Exception as e:
                 self.logger.warning(f"⚠️ Add button selection failed: {e}")
-                
-                # Fallback: Try to find all matching elements and take the first one
-                self.logger.info("🔄 Trying fallback approach - finding all Add buttons...")
-                try:
-                    add_buttons = driver.find_elements(By.CSS_SELECTOR, add_button_selector)
-                    if add_buttons:
-                        add_button = add_buttons[0]  # Take the first one
-                        self.logger.info(f"✅ Found {len(add_buttons)} Add buttons, using first one")
-                    else:
-                        self.logger.error("❌ No Add buttons found with CSS selector")
-                        return False
-                        
-                except Exception as fallback_e:
-                    self.logger.error(f"❌ Fallback approach failed: {fallback_e}")
-                    return False
+                # If indexing fails, just use first button
+                add_button = add_buttons[0]
+                self.logger.info(f"⚠️ Using first button as fallback")
             
             # Step 2: Click the Add button immediately
             self.logger.info("🖱️ Clicking Add button...")
