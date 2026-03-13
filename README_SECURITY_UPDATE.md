@@ -13,7 +13,7 @@ Your Kirana Tap application has been updated with **comprehensive security impro
 Open your terminal/command prompt and run:
 
 ```bash
-cd "C:\Users\Kartik Katyal\Desktop\Kirana Tap 2"
+cd /path/to/kirana-tap
 pip install -r requirements.txt
 ```
 

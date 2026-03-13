@@ -11,7 +11,7 @@ All critical and high-priority security issues in Kirana Tap have been addressed
 ### 1. ❌ HARDCODED SECRET KEY → ✅ FIXED
 **Before**:
 ```python
-app.config['SECRET_KEY'] = 'REDACTED'  # Hardcoded!
+app.config['SECRET_KEY'] = '<REDACTED>'  # Hardcoded!
 ```
 
 **After**:
